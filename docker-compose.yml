@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  ponto-renova:
+    build: .
+    container_name: ponto-renova
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # MUITO IMPORTANTE: Montar a pasta de dados externa para não perder os registros se o container reiniciar!
+      - ./data:/usr/src/app/data
+    environment:
+      - PORT=3000
+      - TZ=America/Sao_Paulo
+      # Descomente e ajuste as variáveis abaixo conforme a localização real da escola:
+      # - SCHOOL_NAME="Escola Renova"
+      # - SCHOOL_LATITUDE=-23.55052
+      # - SCHOOL_LONGITUDE=-46.633308
+      # - ALLOWED_RADIUS_METERS=120
+      # - MAX_ACCURACY_METERS=80
+      # - ADMIN_PIN="123456"
