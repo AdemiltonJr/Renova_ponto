@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f766e">
+    <title>Renova Ponto</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="loginView" class="login-view">
+        <div class="brand-mark" aria-hidden="true">R</div>
+        <h1>Renova Ponto</h1>
+        <p class="muted">Registro interno de entrada e saida com validacao por localizacao.</p>
+        <form id="loginForm" class="panel">
+          <label>
+            Codigo
+            <input name="code" autocomplete="username" inputmode="text" placeholder="ex: colab001" required>
+          </label>
+          <label>
+            PIN
+            <input name="pin" autocomplete="current-password" inputmode="numeric" type="password" placeholder="Seu PIN" required>
+          </label>
+          <button class="primary-button" type="submit">Entrar</button>
+          <p id="loginMessage" class="message" role="status"></p>
+        </form>
+      </section>
+
+      <section id="appView" class="app-view hidden">
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">Escola Renova</span>
+            <h1 id="helloTitle">Ponto</h1>
+          </div>
+          <button id="logoutButton" class="icon-button" type="button" title="Sair" aria-label="Sair">Sair</button>
+        </header>
+
+        <section class="status-card">
+          <div>
+            <span class="eyebrow">Localizacao</span>
+            <strong id="locationStatus">Aguardando permissao</strong>
+          </div>
+          <span id="radiusBadge" class="badge">Raio</span>
+        </section>
+
+        <section class="punch-actions" aria-label="Registrar ponto">
+          <button id="clockInButton" class="punch-button in" type="button">
+            <span>Entrada</span>
+            <small>Registrar chegada</small>
+          </button>
+          <button id="clockOutButton" class="punch-button out" type="button">
+            <span>Saida</span>
+            <small>Registrar saida</small>
+          </button>
+        </section>
+
+        <p id="appMessage" class="message" role="status"></p>
+
+        <section class="panel">
+          <div class="section-heading">
+            <h2>Ultimos registros</h2>
+            <button id="refreshButton" class="text-button" type="button">Atualizar</button>
+          </div>
+          <div id="punchList" class="punch-list"></div>
+        </section>
+
+        <section id="adminPanel" class="panel hidden">
+          <div class="section-heading">
+            <h2>Administrativo</h2>
+            <a class="text-button" href="/api/admin/export.csv">Exportar CSV</a>
+          </div>
+          <div id="adminSummary" class="summary-grid"></div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

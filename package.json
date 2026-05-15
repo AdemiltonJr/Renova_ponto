@@ -1,0 +1,14 @@
+{
+  "name": "renova-ponto",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MVP interno de ponto eletrônico com geolocalização para a Escola Renova.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
