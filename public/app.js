@@ -4,6 +4,35 @@ const state = {
   punches: [],
 };
 
+let intervalTimerId = null;
+
+function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+function updateButtonStates() {
+  if (!state.user) return;
+  const today = new Date().toLocaleDateString("pt-BR");
+  const myPunches = state.punches.filter(p => p.userId === state.user.id && new Date(p.createdAt).toLocaleDateString("pt-BR") === today);
+  const lastPunch = myPunches[0]?.type;
+
+  elements.clockInButton.disabled = true;
+  elements.intervalInButton.disabled = true;
+  elements.intervalOutButton.disabled = true;
+  elements.clockOutButton.disabled = true;
+
+  if (!lastPunch || lastPunch === "out") {
+    elements.clockInButton.disabled = false;
+  } else if (lastPunch === "in" || lastPunch === "interval_out") {
+    elements.intervalInButton.disabled = false;
+    elements.clockOutButton.disabled = false;
+  } else if (lastPunch === "interval_in") {
+    elements.intervalOutButton.disabled = false;
+  }
+}
+
 const elements = {
   loginView: document.querySelector("#loginView"),
   appView: document.querySelector("#appView"),
@@ -67,6 +96,7 @@ function showApp() {
   elements.helloTitle.textContent = `Ola, ${state.user.name.split(" ")[0]}`;
   elements.radiusBadge.textContent = `${state.config.allowedRadiusMeters}m`;
   elements.adminPanel.classList.toggle("hidden", state.user.role !== "admin");
+  requestNotificationPermission();
 }
 
 async function loadPunches() {
@@ -108,6 +138,7 @@ function renderPunches() {
       `;
     })
     .join("");
+  updateButtonStates();
 }
 
 function renderAdmin() {
@@ -207,14 +238,28 @@ async function punch(type) {
     renderPunches();
     renderAdmin();
     setMessage(elements.appMessage, "Ponto registrado com sucesso.", "success");
+
+    if (type === "interval_in") {
+      if ("Notification" in window && Notification.permission === "granted") {
+        if (intervalTimerId) clearTimeout(intervalTimerId);
+        intervalTimerId = setTimeout(() => {
+          new Notification("Escola Renova Ponto", {
+            body: "Seu intervalo de 15 minutos acabou!",
+            icon: "/logo.webp"
+          });
+        }, 15 * 60 * 1000);
+      }
+    } else if (type === "interval_out" || type === "out") {
+      if (intervalTimerId) {
+        clearTimeout(intervalTimerId);
+        intervalTimerId = null;
+      }
+    }
   } catch (error) {
     setMessage(elements.appMessage, error.message, "error");
     await loadPunches().catch(() => {});
   } finally {
-    elements.clockInButton.disabled = false;
-    elements.intervalInButton.disabled = false;
-    elements.intervalOutButton.disabled = false;
-    elements.clockOutButton.disabled = false;
+    updateButtonStates();
   }
 }
 

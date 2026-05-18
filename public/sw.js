@@ -1,4 +1,4 @@
-const CACHE_NAME = "renova-ponto-v4";
+const CACHE_NAME = "renova-ponto-v5";
 const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.json", "/icon.svg", "/logo.webp"];
 
 self.addEventListener("install", (event) => {

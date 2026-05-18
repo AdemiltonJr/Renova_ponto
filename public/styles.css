@@ -359,9 +359,15 @@ input:focus {
 .punch-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-areas: 
+    "in out"
+    "int-in int-out";
   gap: 16px;
 }
+#clockInButton { grid-area: in; }
+#clockOutButton { grid-area: out; }
+#intervalInButton { grid-area: int-in; }
+#intervalOutButton { grid-area: int-out; }
 
 .punch-button {
   display: flex;
@@ -427,7 +433,10 @@ input:focus {
   color: var(--brand-blue);
   border: 2px solid #E2E8F0;
   box-shadow: none;
+  min-height: 80px;
+  padding: 12px 8px;
 }
+.punch-button.interval-in span { font-size: 20px; }
 .punch-button.interval-in::after { display: none; }
 
 .punch-button.interval-out {
@@ -435,7 +444,10 @@ input:focus {
   color: var(--brand-pink);
   border: 2px solid #E2E8F0;
   box-shadow: none;
+  min-height: 80px;
+  padding: 12px 8px;
 }
+.punch-button.interval-out span { font-size: 20px; }
 .punch-button.interval-out::after { display: none; }
 
 /* Punch List */
