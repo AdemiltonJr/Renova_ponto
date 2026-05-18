@@ -51,6 +51,9 @@ const elements = {
   punchList: document.querySelector("#punchList"),
   adminPanel: document.querySelector("#adminPanel"),
   adminSummary: document.querySelector("#adminSummary"),
+  newUserForm: document.querySelector("#newUserForm"),
+  newUserMessage: document.querySelector("#newUserMessage"),
+  adminUserList: document.querySelector("#adminUserList"),
 };
 
 function setMessage(target, text, kind = "") {
@@ -153,7 +156,63 @@ function renderAdmin() {
     <div class="summary-box"><strong>${rejected}</strong><span>Recusados</span></div>
     <div class="summary-box"><strong>${people}</strong><span>Pessoas</span></div>
   `;
+  loadAdminUsers();
 }
+
+async function loadAdminUsers() {
+  if (state.user?.role !== "admin") return;
+  try {
+    const payload = await api("/api/admin/users");
+    renderAdminUsers(payload.users);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function renderAdminUsers(users) {
+  if (!elements.adminUserList) return;
+  elements.adminUserList.innerHTML = users.map(u => `
+    <div class="user-card ${!u.active ? 'inactive' : ''}">
+      <div class="user-card-info">
+        <strong>${escapeHtml(u.name)} <small>(${u.role === 'admin' ? 'Admin' : 'Colab'})</small></strong>
+        <span>Código: ${escapeHtml(u.code)} | Status: ${u.active ? 'Ativo' : 'Inativo'}</span>
+      </div>
+      <div class="user-card-actions">
+        <button onclick="changeUserPin('${u.id}')">Trocar PIN</button>
+        <button onclick="toggleUserActive('${u.id}')" class="${!u.active ? 'action-inactive' : ''}">
+          ${u.active ? 'Ativar' : 'Inativar'}
+        </button>
+      </div>
+    </div>
+  `).join("");
+}
+
+window.changeUserPin = async (userId) => {
+  const newPin = prompt("Digite o novo PIN (senha) para este usuário:");
+  if (!newPin) return;
+  try {
+    await api("/api/admin/users", {
+      method: "PUT",
+      body: JSON.stringify({ id: userId, action: "pin", pin: newPin })
+    });
+    alert("PIN alterado com sucesso!");
+    loadAdminUsers();
+  } catch (error) {
+    alert("Erro: " + error.message);
+  }
+};
+
+window.toggleUserActive = async (userId) => {
+  try {
+    await api("/api/admin/users", {
+      method: "PUT",
+      body: JSON.stringify({ id: userId, action: "toggle_active" })
+    });
+    loadAdminUsers();
+  } catch (error) {
+    alert("Erro: " + error.message);
+  }
+};
 
 function escapeHtml(value) {
   return String(value)
@@ -183,7 +242,11 @@ async function warmLocation() {
     const position = await getPosition();
     updateLocationStatus(position);
   } catch (error) {
-    elements.locationStatus.textContent = error.message || "Permissao de localizacao pendente";
+    let msg = error.message || "Permissao de localizacao pendente";
+    if (msg.includes("User denied") || msg.includes("denied")) {
+      msg = "Permissão Negada! Libere a localização nos Ajustes do seu celular/navegador.";
+    }
+    elements.locationStatus.textContent = msg;
   }
 }
 
@@ -298,6 +361,31 @@ elements.intervalInButton.addEventListener("click", () => punch("interval_in"));
 elements.intervalOutButton.addEventListener("click", () => punch("interval_out"));
 elements.clockOutButton.addEventListener("click", () => punch("out"));
 elements.refreshButton.addEventListener("click", () => loadPunches());
+
+if (elements.newUserForm) {
+  elements.newUserForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = new FormData(elements.newUserForm);
+    elements.newUserMessage.classList.remove("hidden");
+    setMessage(elements.newUserMessage, "Cadastrando...");
+    try {
+      await api("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.get("name"),
+          code: form.get("code"),
+          pin: form.get("pin"),
+          role: form.get("role")
+        })
+      });
+      setMessage(elements.newUserMessage, "Usuário cadastrado com sucesso!", "success");
+      elements.newUserForm.reset();
+      loadAdminUsers();
+    } catch (error) {
+      setMessage(elements.newUserMessage, error.message, "error");
+    }
+  });
+}
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});

@@ -160,6 +160,7 @@ function publicUser(user) {
     code: user.code,
     name: user.name,
     role: user.role,
+    active: user.active,
   };
 }
 
@@ -279,8 +280,53 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === "/api/admin/users" && user.role === "admin") {
-    const users = await readJson(USERS_FILE, []);
-    return send(res, 200, { users: users.map(publicUser) });
+    if (req.method === "GET") {
+      const users = await readJson(USERS_FILE, []);
+      return send(res, 200, { users: users.map(publicUser) });
+    }
+
+    if (req.method === "POST") {
+      const body = await readBody(req);
+      const code = String(body.code || "").trim();
+      const name = String(body.name || "").trim();
+      const pin = String(body.pin || "").trim();
+      const role = body.role === "admin" ? "admin" : "employee";
+
+      if (!code || !name || !pin) return send(res, 400, { error: "Todos os campos sao obrigatorios." });
+
+      const users = await readJson(USERS_FILE, []);
+      if (users.some((u) => u.code.toLowerCase() === code.toLowerCase())) {
+        return send(res, 400, { error: "Este codigo ja esta em uso." });
+      }
+
+      const newUser = await makeUser(code, name, pin, role);
+      users.push(newUser);
+      await writeJson(USERS_FILE, users);
+      return send(res, 201, { user: publicUser(newUser) });
+    }
+
+    if (req.method === "PUT") {
+      const body = await readBody(req);
+      const targetId = body.id;
+      const newPin = body.pin;
+      const action = body.action;
+
+      const users = await readJson(USERS_FILE, []);
+      const targetUser = users.find((u) => u.id === targetId);
+      if (!targetUser) return send(res, 404, { error: "Usuario nao encontrado." });
+
+      if (action === "pin") {
+        if (!newPin) return send(res, 400, { error: "PIN obrigatorio." });
+        const { salt, hash } = await hashPin(newPin);
+        targetUser.salt = salt;
+        targetUser.pinHash = hash;
+      } else if (action === "toggle_active") {
+        targetUser.active = !targetUser.active;
+      }
+
+      await writeJson(USERS_FILE, users);
+      return send(res, 200, { user: publicUser(targetUser) });
+    }
   }
 
   if (url.pathname === "/api/admin/export.csv" && user.role === "admin") {

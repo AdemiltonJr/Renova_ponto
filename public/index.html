@@ -83,7 +83,27 @@
         <section id="adminPanel" class="panel hidden">
           <div class="section-heading">
             <h2>Administrativo</h2>
-            <a class="text-button" href="/api/admin/export.csv">Exportar CSV</a>
+            <div class="admin-actions">
+              <a href="/api/admin/export.csv" class="button" download>Baixar Relatorio (.csv)</a>
+            </div>
+          </div>
+          
+          <div class="admin-users-section">
+            <h3>Cadastrar Novo Usuário</h3>
+            <form id="newUserForm" class="user-form">
+              <input type="text" name="name" placeholder="Nome Completo" required />
+              <input type="text" name="code" placeholder="Código (ex: colab02)" required />
+              <input type="text" name="pin" placeholder="Senha (PIN)" required />
+              <select name="role">
+                <option value="employee">Colaborador</option>
+                <option value="admin">Administrador</option>
+              </select>
+              <button type="submit" class="button secondary">Adicionar</button>
+            </form>
+            <div id="newUserMessage" class="message hidden"></div>
+            
+            <h3 style="margin-top: 2rem;">Usuários Cadastrados</h3>
+            <div id="adminUserList" class="user-list"></div>
           </div>
           <div id="adminSummary" class="summary-grid"></div>
         </section>

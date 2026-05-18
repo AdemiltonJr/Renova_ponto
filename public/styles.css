@@ -96,7 +96,6 @@ button, a {
   height: auto;
   margin-bottom: 8px;
   mix-blend-mode: multiply;
-  filter: drop-shadow(0 12px 24px rgba(46, 91, 153, 0.15));
   animation: logo-float 6s ease-in-out infinite;
 }
 
@@ -270,7 +269,6 @@ input:focus {
   width: 48px;
   height: auto;
   mix-blend-mode: multiply;
-  filter: drop-shadow(0 4px 8px rgba(46, 91, 153, 0.15));
 }
 
 .header-text {
@@ -285,6 +283,73 @@ input:focus {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.summary-box span {
+  font-size: 14px;
+  color: var(--brand-blue);
+  opacity: 0.8;
+}
+
+/* Admin Users UI */
+.admin-users-section {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #E2E8F0;
+}
+.user-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 600px) {
+  .user-form { grid-template-columns: 1fr 1fr; }
+  .user-form button { grid-column: 1 / -1; }
+}
+.user-form input, .user-form select {
+  padding: 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 15px;
+}
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 1rem;
+}
+.user-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+}
+.user-card-info strong { display: block; color: var(--brand-blue); }
+.user-card-info span { font-size: 13px; color: #64748B; }
+.user-card-actions {
+  display: flex;
+  gap: 8px;
+}
+.user-card-actions button {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: #E2E8F0;
+  color: #334155;
+  font-weight: 600;
+}
+.user-card-actions button.action-inactive {
+  background: var(--brand-pink);
+  color: white;
+}
+.user-card.inactive { opacity: 0.6; }
 
 #helloTitle {
   font-size: 26px;
