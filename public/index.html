@@ -3,15 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0f766e">
+    <meta name="theme-color" content="#2D598B">
     <title>Renova Ponto</title>
     <link rel="manifest" href="/manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
     <main class="app-shell">
       <section id="loginView" class="login-view">
-        <div class="brand-mark" aria-hidden="true">R</div>
+        <img src="/logo.webp" alt="Escola Renova" class="brand-logo">
         <h1>Renova Ponto</h1>
         <p class="muted">Registro interno de entrada e saida com validacao por localizacao.</p>
         <form id="loginForm" class="panel">
@@ -30,9 +33,12 @@
 
       <section id="appView" class="app-view hidden">
         <header class="topbar">
-          <div>
-            <span class="eyebrow">Escola Renova</span>
-            <h1 id="helloTitle">Ponto</h1>
+          <div class="header-branding">
+            <img src="/logo.webp" alt="Escola Renova" class="header-logo">
+            <div class="header-text">
+              <span class="eyebrow">Escola Renova</span>
+              <h1 id="helloTitle">Ponto</h1>
+            </div>
           </div>
           <button id="logoutButton" class="icon-button" type="button" title="Sair" aria-label="Sair">Sair</button>
         </header>
