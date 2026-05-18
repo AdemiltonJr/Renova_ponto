@@ -359,6 +359,7 @@ input:focus {
 .punch-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
   gap: 16px;
 }
 
@@ -420,6 +421,22 @@ input:focus {
   background: var(--brand-pink);
   color: white;
 }
+
+.punch-button.interval-in {
+  background: #F1F5F9;
+  color: var(--brand-blue);
+  border: 2px solid #E2E8F0;
+  box-shadow: none;
+}
+.punch-button.interval-in::after { display: none; }
+
+.punch-button.interval-out {
+  background: #F1F5F9;
+  color: var(--brand-pink);
+  border: 2px solid #E2E8F0;
+  box-shadow: none;
+}
+.punch-button.interval-out::after { display: none; }
 
 /* Punch List */
 .section-heading {

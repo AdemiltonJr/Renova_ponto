@@ -14,6 +14,8 @@ const elements = {
   locationStatus: document.querySelector("#locationStatus"),
   radiusBadge: document.querySelector("#radiusBadge"),
   clockInButton: document.querySelector("#clockInButton"),
+  intervalInButton: document.querySelector("#intervalInButton"),
+  intervalOutButton: document.querySelector("#intervalOutButton"),
   clockOutButton: document.querySelector("#clockOutButton"),
   refreshButton: document.querySelector("#refreshButton"),
   appMessage: document.querySelector("#appMessage"),
@@ -84,7 +86,13 @@ function renderPunches() {
     .slice(0, 20)
     .map((punch) => {
       const date = new Date(punch.createdAt);
-      const type = punch.type === "in" ? "Entrada" : "Saida";
+      const typeLabels = {
+        "in": "Entrada Trab.",
+        "interval_in": "Entrada Int.",
+        "interval_out": "Saída Int.",
+        "out": "Saída Trab."
+      };
+      const type = typeLabels[punch.type] || "Ponto";
       const status = punch.status === "approved" ? "Aprovado" : "Recusado";
       const detail = punch.status === "approved"
         ? `${Math.round(punch.distanceMeters || 0)}m da escola`
@@ -178,6 +186,8 @@ function distanceMeters(aLat, aLng, bLat, bLng) {
 async function punch(type) {
   setMessage(elements.appMessage, "Obtendo localizacao precisa...");
   elements.clockInButton.disabled = true;
+  elements.intervalInButton.disabled = true;
+  elements.intervalOutButton.disabled = true;
   elements.clockOutButton.disabled = true;
   try {
     const position = await getPosition();
@@ -202,6 +212,8 @@ async function punch(type) {
     await loadPunches().catch(() => {});
   } finally {
     elements.clockInButton.disabled = false;
+    elements.intervalInButton.disabled = false;
+    elements.intervalOutButton.disabled = false;
     elements.clockOutButton.disabled = false;
   }
 }
@@ -237,6 +249,8 @@ elements.logoutButton.addEventListener("click", async () => {
 });
 
 elements.clockInButton.addEventListener("click", () => punch("in"));
+elements.intervalInButton.addEventListener("click", () => punch("interval_in"));
+elements.intervalOutButton.addEventListener("click", () => punch("interval_out"));
 elements.clockOutButton.addEventListener("click", () => punch("out"));
 elements.refreshButton.addEventListener("click", () => loadPunches());
 

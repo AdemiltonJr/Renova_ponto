@@ -254,7 +254,8 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === "/api/punches" && req.method === "POST") {
     const body = await readBody(req);
-    const type = body.type === "out" ? "out" : "in";
+    const validTypes = ["in", "interval_in", "interval_out", "out"];
+    const type = validTypes.includes(body.type) ? body.type : "in";
     const location = validateLocation(body.location || {});
     const punches = await readJson(PUNCHES_FILE, []);
     const punch = {
@@ -290,7 +291,7 @@ async function handleApi(req, res, url) {
         punch.createdAt,
         punch.userCode,
         punch.userName,
-        punch.type === "in" ? "entrada" : "saida",
+        punch.type === "in" ? "Entrada Trabalho" : punch.type === "interval_in" ? "Entrada Intervalo" : punch.type === "interval_out" ? "Saida Intervalo" : "Saida Trabalho",
         punch.status,
         punch.distanceMeters ?? "",
         punch.accuracy ?? "",
