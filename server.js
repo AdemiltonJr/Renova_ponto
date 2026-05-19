@@ -453,10 +453,12 @@ async function serveStatic(req, res, url) {
     const stat = await fs.stat(filePath);
     if (stat.isDirectory()) return redirect(res, "/");
     const extension = path.extname(filePath);
+    const fileName = path.basename(filePath);
     const file = await fs.readFile(filePath);
+    const noStoreAssets = new Set([".html", ".js", ".css"]);
     res.writeHead(200, {
       "Content-Type": contentTypes[extension] || "application/octet-stream",
-      "Cache-Control": extension === ".html" ? "no-store" : "public, max-age=3600",
+      "Cache-Control": fileName === "sw.js" || noStoreAssets.has(extension) ? "no-store" : "public, max-age=3600",
     });
     res.end(file);
   } catch {

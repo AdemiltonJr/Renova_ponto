@@ -46,6 +46,31 @@ Use a latitude e longitude reais da escola. O navegador so libera geolocalizacao
 
 ## Deploy sugerido na VPS
 
+### Com Docker Compose ao lado de outra aplicacao
+
+Este projeto pode rodar separado de outras aplicacoes da VPS, como Chatwoot, em outro projeto Docker Compose.
+
+1. Copie `.env.example` para `.env`.
+2. Ajuste `ADMIN_PIN`, `DEMO_PIN`, `SCHOOL_LATITUDE`, `SCHOOL_LONGITUDE` e demais variaveis.
+3. Suba o container:
+
+```bash
+docker compose up -d --build
+```
+
+Por padrao, o compose publica a aplicacao apenas em `127.0.0.1:3001`, para ficar atras do Nginx:
+
+```yaml
+ports:
+  - "${HOST_BIND:-127.0.0.1}:${HOST_PORT:-3001}:3000"
+```
+
+Os dados ficam persistidos em `./data`.
+
+Importante: os usuarios iniciais sao criados no primeiro start. Se voce subir uma vez com PINs temporarios, pare o container, ajuste o `.env` e remova os arquivos de teste em `data/` antes do uso real.
+
+### Sem Docker
+
 1. Copie a pasta do projeto para a VPS.
 2. Instale Node.js 20 ou superior.
 3. Configure as variaveis de ambiente com a coordenada real da escola.
@@ -55,7 +80,7 @@ Use a latitude e longitude reais da escola. O navegador so libera geolocalizacao
 npm start
 ```
 
-5. Aponte o dominio para a VPS e faça proxy reverso HTTPS para a porta `3000`.
+5. Aponte o dominio para a VPS e faça proxy reverso HTTPS para a porta configurada.
 
 Exemplo Nginx:
 
@@ -64,7 +89,7 @@ server {
   server_name ponto.seudominio.com.br;
 
   location / {
-    proxy_pass http://127.0.0.1:3000;
+    proxy_pass http://127.0.0.1:3001;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
