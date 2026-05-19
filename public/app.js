@@ -2,6 +2,8 @@ const state = {
   user: null,
   config: null,
   punches: [],
+  users: [],
+  activeTab: "dashboard",
 };
 
 let intervalTimerId = null;
@@ -33,6 +35,14 @@ function updateButtonStates() {
   }
 }
 
+function translateError(error) {
+  let msg = error.message || "Erro desconhecido";
+  if (msg.includes("User denied") || msg.includes("denied")) {
+    return "Permissão Negada! Libere a localização nos Ajustes.";
+  }
+  return msg;
+}
+
 const elements = {
   loginView: document.querySelector("#loginView"),
   appView: document.querySelector("#appView"),
@@ -49,11 +59,42 @@ const elements = {
   refreshButton: document.querySelector("#refreshButton"),
   appMessage: document.querySelector("#appMessage"),
   punchList: document.querySelector("#punchList"),
-  adminPanel: document.querySelector("#adminPanel"),
+  
+  // Elementos do Dashboard Administrativo
+  adminTabs: document.querySelector("#adminTabs"),
+  employeeView: document.querySelector("#employeeView"),
+  adminView: document.querySelector("#adminView"),
   adminSummary: document.querySelector("#adminSummary"),
   newUserForm: document.querySelector("#newUserForm"),
   newUserMessage: document.querySelector("#newUserMessage"),
   adminUserList: document.querySelector("#adminUserList"),
+  refreshDashboardBtn: document.querySelector("#refreshDashboardBtn"),
+  dashboardRecentList: document.querySelector("#dashboardRecentList"),
+  
+  // Elementos da Aba de Espelho de Ponto
+  btnOpenManualPunch: document.querySelector("#btnOpenManualPunch"),
+  btnCloseManualPunch: document.querySelector("#btnCloseManualPunch"),
+  manualPunchModal: document.querySelector("#manualPunchModal"),
+  manualPunchForm: document.querySelector("#manualPunchForm"),
+  manualPunchMessage: document.querySelector("#manualPunchMessage"),
+  manualPunchUserSelect: document.querySelector("#manualPunchUserSelect"),
+  filterSearch: document.querySelector("#filterSearch"),
+  filterDate: document.querySelector("#filterDate"),
+  filterType: document.querySelector("#filterType"),
+  filterStatus: document.querySelector("#filterStatus"),
+  adminPunchesTableBody: document.querySelector("#adminPunchesTableBody"),
+  adminPunchesEmpty: document.querySelector("#adminPunchesEmpty"),
+  
+  // Elementos do Ponto do Administrador (Pessoal)
+  adminLocationStatus: document.querySelector("#adminLocationStatus"),
+  adminRadiusBadge: document.querySelector("#adminRadiusBadge"),
+  adminClockInButton: document.querySelector("#adminClockInButton"),
+  adminIntervalInButton: document.querySelector("#adminIntervalInButton"),
+  adminIntervalOutButton: document.querySelector("#adminIntervalOutButton"),
+  adminClockOutButton: document.querySelector("#adminClockOutButton"),
+  adminAppMessage: document.querySelector("#adminAppMessage"),
+  adminRefreshButton: document.querySelector("#adminRefreshButton"),
+  adminPunchList: document.querySelector("#adminPunchList"),
 };
 
 function setMessage(target, text, kind = "") {
@@ -97,16 +138,58 @@ function showApp() {
   elements.loginView.classList.add("hidden");
   elements.appView.classList.remove("hidden");
   elements.helloTitle.textContent = `Ola, ${state.user.name.split(" ")[0]}`;
-  elements.radiusBadge.textContent = `${state.config.allowedRadiusMeters}m`;
-  elements.adminPanel.classList.toggle("hidden", state.user.role !== "admin");
+  
+  const isAdm = state.user.role === "admin";
+  document.querySelector(".app-shell").classList.toggle("admin-mode", isAdm);
+  elements.adminTabs.classList.toggle("hidden", !isAdm);
+  elements.employeeView.classList.toggle("hidden", isAdm);
+  elements.adminView.classList.toggle("hidden", !isAdm);
+
+  if (isAdm) {
+    switchTab(state.activeTab || "dashboard");
+  } else {
+    elements.radiusBadge.textContent = `${state.config.allowedRadiusMeters}m`;
+  }
   requestNotificationPermission();
+}
+
+function switchTab(tabId) {
+  state.activeTab = tabId;
+  
+  document.querySelectorAll(".tab-button").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
+  });
+  
+  document.querySelectorAll(".tab-content").forEach(content => {
+    content.classList.add("hidden");
+  });
+  
+  const targetContent = document.querySelector(`#tab-${tabId}`);
+  if (targetContent) {
+    targetContent.classList.remove("hidden");
+  }
+  
+  if (tabId === "dashboard") {
+    renderAdminSummary();
+  } else if (tabId === "punches") {
+    renderAdminPunchesTable();
+  } else if (tabId === "users") {
+    loadAdminUsers();
+  } else if (tabId === "my-punch") {
+    renderAdminPersonalPunch();
+  }
 }
 
 async function loadPunches() {
   const payload = await api("/api/punches");
   state.punches = payload.punches || [];
-  renderPunches();
-  renderAdmin();
+  if (state.user?.role === "admin") {
+    renderAdminSummary();
+    renderAdminPunchesTable();
+    renderAdminPersonalPunch();
+  } else {
+    renderPunches();
+  }
 }
 
 function renderPunches() {
@@ -144,26 +227,60 @@ function renderPunches() {
   updateButtonStates();
 }
 
-function renderAdmin() {
+function renderAdminSummary() {
   if (state.user?.role !== "admin") return;
   const today = new Date().toLocaleDateString("pt-BR");
   const todayPunches = state.punches.filter((punch) => new Date(punch.createdAt).toLocaleDateString("pt-BR") === today);
   const approved = todayPunches.filter((punch) => punch.status === "approved").length;
   const rejected = todayPunches.filter((punch) => punch.status === "rejected").length;
   const people = new Set(todayPunches.map((punch) => punch.userId)).size;
+  
   elements.adminSummary.innerHTML = `
-    <div class="summary-box"><strong>${approved}</strong><span>Aprovados</span></div>
-    <div class="summary-box"><strong>${rejected}</strong><span>Recusados</span></div>
-    <div class="summary-box"><strong>${people}</strong><span>Pessoas</span></div>
+    <div class="summary-box"><strong>${approved}</strong><span>Aprovados Hoje</span></div>
+    <div class="summary-box"><strong>${rejected}</strong><span>Recusados Hoje</span></div>
+    <div class="summary-box"><strong>${people}</strong><span>Pessoas Hoje</span></div>
   `;
-  loadAdminUsers();
+
+  if (!todayPunches.length) {
+    elements.dashboardRecentList.innerHTML = '<p class="empty">Nenhum registro hoje.</p>';
+    return;
+  }
+
+  elements.dashboardRecentList.innerHTML = todayPunches
+    .slice(0, 10)
+    .map((punch) => {
+      const date = new Date(punch.createdAt);
+      const typeLabels = {
+        "in": "Entrada Trab.",
+        "interval_in": "Entrada Int.",
+        "interval_out": "Saída Int.",
+        "out": "Saída Trab."
+      };
+      const type = typeLabels[punch.type] || "Ponto";
+      const status = punch.status === "approved" ? "Aprovado" : "Recusado";
+      const detail = punch.status === "approved"
+        ? `${Math.round(punch.distanceMeters || 0)}m da escola`
+        : punch.reason || "Registro recusado";
+      return `
+        <article class="punch-item">
+          <div>
+            <strong>${escapeHtml(punch.userName)} - ${type}</strong>
+            <span>${date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · ${detail}</span>
+          </div>
+          <span class="status-pill ${punch.status === "rejected" ? "rejected" : ""}">${status}</span>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 async function loadAdminUsers() {
   if (state.user?.role !== "admin") return;
   try {
     const payload = await api("/api/admin/users");
-    renderAdminUsers(payload.users);
+    state.users = payload.users || [];
+    renderAdminUsers(state.users);
+    populateUserSelect();
   } catch (error) {
     console.error(error);
   }
@@ -180,7 +297,7 @@ function renderAdminUsers(users) {
       <div class="user-card-actions">
         <button onclick="changeUserPin('${u.id}')">Trocar PIN</button>
         <button onclick="toggleUserActive('${u.id}')" class="${!u.active ? 'action-inactive' : ''}">
-          ${u.active ? 'Ativar' : 'Inativar'}
+          ${u.active ? 'Inativar' : 'Ativar'}
         </button>
       </div>
     </div>
@@ -242,11 +359,7 @@ async function warmLocation() {
     const position = await getPosition();
     updateLocationStatus(position);
   } catch (error) {
-    let msg = error.message || "Permissao de localizacao pendente";
-    if (msg.includes("User denied") || msg.includes("denied")) {
-      msg = "Permissão Negada! Libere a localização nos Ajustes do seu celular/navegador.";
-    }
-    elements.locationStatus.textContent = msg;
+    elements.locationStatus.textContent = translateError(error);
   }
 }
 
@@ -259,9 +372,15 @@ function updateLocationStatus(position) {
   );
   const accuracy = Math.round(position.coords.accuracy || 0);
   const inside = distance <= state.config.allowedRadiusMeters && accuracy <= state.config.maxAccuracyMeters;
-  elements.locationStatus.textContent = inside
+  const text = inside
     ? `Dentro do raio (${Math.round(distance)}m)`
     : `Fora/sem precisao (${Math.round(distance)}m, precisao ${accuracy}m)`;
+  if (elements.locationStatus) {
+    elements.locationStatus.textContent = text;
+  }
+  if (elements.adminLocationStatus) {
+    elements.adminLocationStatus.textContent = text;
+  }
 }
 
 function distanceMeters(aLat, aLng, bLat, bLng) {
@@ -277,12 +396,19 @@ function distanceMeters(aLat, aLng, bLat, bLng) {
   return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function punch(type) {
-  setMessage(elements.appMessage, "Obtendo localizacao precisa...");
-  elements.clockInButton.disabled = true;
-  elements.intervalInButton.disabled = true;
-  elements.intervalOutButton.disabled = true;
-  elements.clockOutButton.disabled = true;
+async function punch(type, isAdminPersonal = false) {
+  const msgElement = isAdminPersonal ? elements.adminAppMessage : elements.appMessage;
+  const inBtn = isAdminPersonal ? elements.adminClockInButton : elements.clockInButton;
+  const intInBtn = isAdminPersonal ? elements.adminIntervalInButton : elements.intervalInButton;
+  const intOutBtn = isAdminPersonal ? elements.adminIntervalOutButton : elements.intervalOutButton;
+  const outBtn = isAdminPersonal ? elements.adminClockOutButton : elements.clockOutButton;
+
+  setMessage(msgElement, "Obtendo localizacao precisa...");
+  inBtn.disabled = true;
+  intInBtn.disabled = true;
+  intOutBtn.disabled = true;
+  outBtn.disabled = true;
+  
   try {
     const position = await getPosition();
     updateLocationStatus(position);
@@ -298,9 +424,15 @@ async function punch(type) {
       }),
     });
     state.punches.unshift(payload.punch);
-    renderPunches();
-    renderAdmin();
-    setMessage(elements.appMessage, "Ponto registrado com sucesso.", "success");
+    
+    if (state.user?.role === "admin") {
+      renderAdminSummary();
+      renderAdminPunchesTable();
+      renderAdminPersonalPunch();
+    } else {
+      renderPunches();
+    }
+    setMessage(msgElement, "Ponto registrado com sucesso.", "success");
 
     if (type === "interval_in") {
       if ("Notification" in window && Notification.permission === "granted") {
@@ -319,12 +451,232 @@ async function punch(type) {
       }
     }
   } catch (error) {
-    setMessage(elements.appMessage, error.message, "error");
+    setMessage(msgElement, translateError(error), "error");
     await loadPunches().catch(() => {});
   } finally {
-    updateButtonStates();
+    if (isAdminPersonal) {
+      updateAdminPersonalButtonStates();
+    } else {
+      updateButtonStates();
+    }
   }
 }
+
+function populateUserSelect() {
+  if (!elements.manualPunchUserSelect) return;
+  const activeEmployees = state.users.filter(u => u.active && u.role === "employee");
+  elements.manualPunchUserSelect.innerHTML = activeEmployees.map(u => `
+    <option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.code)})</option>
+  `).join("");
+}
+
+function matchesDateFilter(createdAtStr, filterValue) {
+  const date = new Date(createdAtStr);
+  const now = new Date();
+  const todayStr = now.toLocaleDateString("pt-BR");
+  const dateStr = date.toLocaleDateString("pt-BR");
+  
+  if (filterValue === "today") {
+    return dateStr === todayStr;
+  }
+  
+  if (filterValue === "yesterday") {
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    return dateStr === yesterday.toLocaleDateString("pt-BR");
+  }
+  
+  if (filterValue === "week") {
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 7;
+  }
+  
+  if (filterValue === "month") {
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  }
+  
+  return true; // "all"
+}
+
+function renderAdminPunchesTable() {
+  if (state.user?.role !== "admin") return;
+  
+  const searchVal = (elements.filterSearch.value || "").trim().toLowerCase();
+  const dateVal = elements.filterDate.value;
+  const typeVal = elements.filterType.value;
+  const statusVal = elements.filterStatus.value;
+  
+  const filtered = state.punches.filter(punch => {
+    const matchesSearch = !searchVal || 
+      (punch.userName && punch.userName.toLowerCase().includes(searchVal)) || 
+      (punch.userCode && punch.userCode.toLowerCase().includes(searchVal));
+    const matchesDate = matchesDateFilter(punch.createdAt, dateVal);
+    const matchesType = typeVal === "all" || punch.type === typeVal;
+    const matchesStatus = statusVal === "all" || punch.status === statusVal;
+    
+    return matchesSearch && matchesDate && matchesType && matchesStatus;
+  });
+  
+  if (!filtered.length) {
+    elements.adminPunchesTableBody.innerHTML = "";
+    elements.adminPunchesEmpty.classList.remove("hidden");
+    return;
+  }
+  
+  elements.adminPunchesEmpty.classList.add("hidden");
+  
+  const typeLabels = {
+    "in": "Entrada Trab.",
+    "interval_in": "Entrada Int.",
+    "interval_out": "Saída Int.",
+    "out": "Saída Trab."
+  };
+  
+  elements.adminPunchesTableBody.innerHTML = filtered.map(punch => {
+    const date = new Date(punch.createdAt);
+    const typeLabel = typeLabels[punch.type] || "Ponto";
+    const statusLabel = punch.status === "approved" ? "Aprovado" : "Recusado";
+    const statusClass = punch.status === "rejected" ? "rejected" : "";
+    
+    let details = "";
+    if (punch.status === "approved") {
+      details = punch.distanceMeters !== null ? `${punch.distanceMeters}m da escola` : "Registro Manual";
+    } else {
+      details = punch.reason || "Fora do raio/sem precisão";
+    }
+    
+    const mapsLink = punch.latitude && punch.longitude
+      ? `<a href="https://www.google.com/maps/search/?api=1&query=${punch.latitude},${punch.longitude}" target="_blank" class="btn-map" title="Ver localização no mapa">📍 Mapa</a>`
+      : `<span>Sem GPS</span>`;
+      
+    const toggleLabel = punch.status === "approved" ? "Negar" : "Aprovar";
+    const toggleClass = punch.status === "approved" ? "delete" : "approve";
+    const toggleTargetStatus = punch.status === "approved" ? "rejected" : "approved";
+    
+    return `
+      <tr>
+        <td data-label="Colaborador">
+          <strong>${escapeHtml(punch.userName)}</strong>
+          <span>Código: ${escapeHtml(punch.userCode)}</span>
+        </td>
+        <td data-label="Data/Hora">
+          <strong>${date.toLocaleDateString("pt-BR")}</strong>
+          <span>${date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+        </td>
+        <td data-label="Tipo">
+          <strong>${typeLabel}</strong>
+        </td>
+        <td data-label="Status">
+          <span class="status-pill ${statusClass}">${statusLabel}</span>
+        </td>
+        <td data-label="Localização">
+          <strong>${details}</strong>
+          ${mapsLink}
+        </td>
+        <td data-label="Ações">
+          <button onclick="overridePunchStatus('${punch.id}', '${toggleTargetStatus}')" class="btn-action-table ${toggleClass}">
+            ${toggleLabel}
+          </button>
+          <button onclick="deletePunch('${punch.id}')" class="btn-action-table delete" title="Excluir ponto permanentemente">
+            Excluir
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderAdminPersonalPunch() {
+  if (!state.user || state.user.role !== "admin") return;
+  
+  elements.adminRadiusBadge.textContent = `${state.config.allowedRadiusMeters}m`;
+  
+  const myPunches = state.punches.filter(p => p.userId === state.user.id);
+  if (!myPunches.length) {
+    elements.adminPunchList.innerHTML = '<p class="empty">Nenhum registro seu ainda.</p>';
+  } else {
+    elements.adminPunchList.innerHTML = myPunches
+      .slice(0, 20)
+      .map((punch) => {
+        const date = new Date(punch.createdAt);
+        const typeLabels = {
+          "in": "Entrada Trab.",
+          "interval_in": "Entrada Int.",
+          "interval_out": "Saída Int.",
+          "out": "Saída Trab."
+        };
+        const type = typeLabels[punch.type] || "Ponto";
+        const status = punch.status === "approved" ? "Aprovado" : "Recusado";
+        const detail = punch.status === "approved"
+          ? `${Math.round(punch.distanceMeters || 0)}m da escola`
+          : punch.reason || "Registro recusado";
+        return `
+          <article class="punch-item">
+            <div>
+              <strong>${type}</strong>
+              <span>${date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} · ${detail}</span>
+            </div>
+            <span class="status-pill ${punch.status === "rejected" ? "rejected" : ""}">${status}</span>
+          </article>
+        `;
+      })
+      .join("");
+  }
+  
+  updateAdminPersonalButtonStates();
+}
+
+function updateAdminPersonalButtonStates() {
+  if (!state.user) return;
+  const today = new Date().toLocaleDateString("pt-BR");
+  const myPunches = state.punches.filter(p => p.userId === state.user.id && new Date(p.createdAt).toLocaleDateString("pt-BR") === today);
+  const lastPunch = myPunches[0]?.type;
+
+  elements.adminClockInButton.disabled = true;
+  elements.adminIntervalInButton.disabled = true;
+  elements.adminIntervalOutButton.disabled = true;
+  elements.adminClockOutButton.disabled = true;
+
+  if (!lastPunch || lastPunch === "out") {
+    elements.adminClockInButton.disabled = false;
+  } else if (lastPunch === "in" || lastPunch === "interval_out") {
+    elements.adminIntervalInButton.disabled = false;
+    elements.adminClockOutButton.disabled = false;
+  } else if (lastPunch === "interval_in") {
+    elements.adminIntervalOutButton.disabled = false;
+  }
+}
+
+window.overridePunchStatus = async (punchId, targetStatus) => {
+  const defaultReason = targetStatus === "approved" ? "Aprovado manualmente pelo Admin" : "Recusado pelo Admin";
+  const reason = prompt("Justificativa da alteração:", defaultReason);
+  if (reason === null) return;
+
+  try {
+    await api("/api/admin/punches", {
+      method: "PUT",
+      body: JSON.stringify({ punchId, status: targetStatus, reason })
+    });
+    alert("Status do ponto alterado com sucesso!");
+    await loadPunches();
+  } catch (error) {
+    alert("Erro: " + error.message);
+  }
+};
+
+window.deletePunch = async (punchId) => {
+  if (!confirm("Tem certeza que deseja excluir permanentemente este registro de ponto?")) return;
+  try {
+    await api(`/api/admin/punches?punchId=${encodeURIComponent(punchId)}`, {
+      method: "DELETE"
+    });
+    alert("Registro de ponto excluído!");
+    await loadPunches();
+  } catch (error) {
+    alert("Erro: " + error.message);
+  }
+};
 
 elements.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -361,6 +713,89 @@ elements.intervalInButton.addEventListener("click", () => punch("interval_in"));
 elements.intervalOutButton.addEventListener("click", () => punch("interval_out"));
 elements.clockOutButton.addEventListener("click", () => punch("out"));
 elements.refreshButton.addEventListener("click", () => loadPunches());
+
+// Event Listeners dos botões de ponto pessoal do Admin
+elements.adminClockInButton.addEventListener("click", () => punch("in", true));
+elements.adminIntervalInButton.addEventListener("click", () => punch("interval_in", true));
+elements.adminIntervalOutButton.addEventListener("click", () => punch("interval_out", true));
+elements.adminClockOutButton.addEventListener("click", () => punch("out", true));
+elements.adminRefreshButton.addEventListener("click", () => loadPunches());
+
+// Abas do Admin
+document.querySelectorAll(".tab-button").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    const tabId = e.currentTarget.getAttribute("data-tab");
+    switchTab(tabId);
+  });
+});
+
+// Filtros do Espelho de Ponto
+if (elements.filterSearch) {
+  elements.filterSearch.addEventListener("input", () => renderAdminPunchesTable());
+  elements.filterDate.addEventListener("change", () => renderAdminPunchesTable());
+  elements.filterType.addEventListener("change", () => renderAdminPunchesTable());
+  elements.filterStatus.addEventListener("change", () => renderAdminPunchesTable());
+}
+
+// Modal de Registro Manual
+if (elements.btnOpenManualPunch) {
+  elements.btnOpenManualPunch.addEventListener("click", () => {
+    elements.manualPunchModal.classList.remove("hidden");
+    const now = new Date();
+    const dateInput = elements.manualPunchForm.querySelector('input[name="date"]');
+    const timeInput = elements.manualPunchForm.querySelector('input[name="time"]');
+    
+    dateInput.value = now.toISOString().slice(0, 10);
+    timeInput.value = now.toTimeString().slice(0, 8);
+    
+    elements.manualPunchMessage.classList.add("hidden");
+    elements.manualPunchForm.reset();
+    
+    dateInput.value = now.toISOString().slice(0, 10);
+    timeInput.value = now.toTimeString().slice(0, 8);
+  });
+}
+
+if (elements.btnCloseManualPunch) {
+  elements.btnCloseManualPunch.addEventListener("click", () => {
+    elements.manualPunchModal.classList.add("hidden");
+  });
+}
+
+if (elements.manualPunchForm) {
+  elements.manualPunchForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setMessage(elements.manualPunchMessage, "Registrando...");
+    elements.manualPunchMessage.classList.remove("hidden");
+    
+    const form = new FormData(elements.manualPunchForm);
+    const userId = form.get("userId");
+    const date = form.get("date");
+    const time = form.get("time");
+    const type = form.get("type");
+    const reason = form.get("reason");
+    
+    const createdAt = new Date(`${date}T${time}`).toISOString();
+    
+    try {
+      await api("/api/admin/punches", {
+        method: "POST",
+        body: JSON.stringify({ userId, type, createdAt, reason })
+      });
+      setMessage(elements.manualPunchMessage, "Ponto manual registrado com sucesso!", "success");
+      await loadPunches();
+      setTimeout(() => {
+        elements.manualPunchModal.classList.add("hidden");
+      }, 1500);
+    } catch (error) {
+      setMessage(elements.manualPunchMessage, error.message, "error");
+    }
+  });
+}
+
+if (elements.refreshDashboardBtn) {
+  elements.refreshDashboardBtn.addEventListener("click", () => loadPunches());
+}
 
 if (elements.newUserForm) {
   elements.newUserForm.addEventListener("submit", async (e) => {

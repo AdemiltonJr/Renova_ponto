@@ -329,6 +329,90 @@ async function handleApi(req, res, url) {
     }
   }
 
+  if (url.pathname === "/api/admin/punches" && user.role === "admin") {
+    if (req.method === "POST") {
+      const body = await readBody(req);
+      const targetUserId = body.userId;
+      const type = body.type;
+      const createdAt = body.createdAt;
+      const reason = body.reason || "Registro manual por admin";
+
+      if (!targetUserId || !type || !createdAt) {
+        return send(res, 400, { error: "Todos os campos são obrigatórios." });
+      }
+
+      const users = await readJson(USERS_FILE, []);
+      const targetUser = users.find((u) => u.id === targetUserId);
+      if (!targetUser) {
+        return send(res, 404, { error: "Usuário não encontrado." });
+      }
+
+      const punches = await readJson(PUNCHES_FILE, []);
+      const newPunch = {
+        id: crypto.randomUUID(),
+        userId: targetUser.id,
+        userCode: targetUser.code,
+        userName: targetUser.name,
+        type,
+        status: "approved",
+        reason,
+        latitude: config.schoolLatitude,
+        longitude: config.schoolLongitude,
+        accuracy: 1,
+        distanceMeters: 0,
+        createdAt: new Date(createdAt).toISOString(),
+      };
+
+      punches.push(newPunch);
+      await writeJson(PUNCHES_FILE, punches);
+      return send(res, 201, { punch: newPunch });
+    }
+
+    if (req.method === "PUT") {
+      const body = await readBody(req);
+      const punchId = body.punchId;
+      const status = body.status;
+      const reason = body.reason || null;
+
+      if (!punchId || !status) {
+        return send(res, 400, { error: "Campos punchId e status são obrigatórios." });
+      }
+
+      const punches = await readJson(PUNCHES_FILE, []);
+      const punch = punches.find((p) => p.id === punchId);
+      if (!punch) {
+        return send(res, 404, { error: "Ponto não encontrado." });
+      }
+
+      punch.status = status;
+      punch.reason = reason;
+      await writeJson(PUNCHES_FILE, punches);
+      return send(res, 200, { punch });
+    }
+
+    if (req.method === "DELETE") {
+      let punchId = url.searchParams.get("punchId");
+      if (!punchId) {
+        const body = await readBody(req).catch(() => ({}));
+        punchId = body.punchId;
+      }
+
+      if (!punchId) {
+        return send(res, 400, { error: "O campo punchId é obrigatório." });
+      }
+
+      const punches = await readJson(PUNCHES_FILE, []);
+      const index = punches.findIndex((p) => p.id === punchId);
+      if (index === -1) {
+        return send(res, 404, { error: "Ponto não encontrado." });
+      }
+
+      punches.splice(index, 1);
+      await writeJson(PUNCHES_FILE, punches);
+      return send(res, 200, { success: true });
+    }
+  }
+
   if (url.pathname === "/api/admin/export.csv" && user.role === "admin") {
     const punches = await readJson(PUNCHES_FILE, []);
     const rows = [

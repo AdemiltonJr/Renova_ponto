@@ -43,72 +43,250 @@
           <button id="logoutButton" class="icon-button" type="button" title="Sair" aria-label="Sair">Sair</button>
         </header>
 
-        <section class="status-card">
-          <div>
-            <span class="eyebrow">Localizacao</span>
-            <strong id="locationStatus">Aguardando permissao</strong>
-          </div>
-          <span id="radiusBadge" class="badge">Raio</span>
-        </section>
+        <!-- Menu de Abas Administrativas -->
+        <nav id="adminTabs" class="admin-tabs hidden">
+          <button class="tab-button active" data-tab="dashboard" type="button">Painel Geral</button>
+          <button class="tab-button" data-tab="punches" type="button">Espelho de Ponto</button>
+          <button class="tab-button" data-tab="users" type="button">Colaboradores</button>
+          <button class="tab-button" data-tab="my-punch" type="button">Registrar Ponto</button>
+        </nav>
 
-        <section class="punch-actions" aria-label="Registrar ponto">
-          <button id="clockInButton" class="punch-button in" type="button">
-            <span>Entrada</span>
-            <small>Trabalho</small>
-          </button>
-          <button id="intervalInButton" class="punch-button interval-in" type="button">
-            <span>Iniciar</span>
-            <small>Intervalo</small>
-          </button>
-          <button id="intervalOutButton" class="punch-button interval-out" type="button">
-            <span>Finalizar</span>
-            <small>Intervalo</small>
-          </button>
-          <button id="clockOutButton" class="punch-button out" type="button">
-            <span>Saída</span>
-            <small>Trabalho</small>
-          </button>
-        </section>
-
-        <p id="appMessage" class="message" role="status"></p>
-
-        <section class="panel">
-          <div class="section-heading">
-            <h2>Ultimos registros</h2>
-            <button id="refreshButton" class="text-button" type="button">Atualizar</button>
-          </div>
-          <div id="punchList" class="punch-list"></div>
-        </section>
-
-        <section id="adminPanel" class="panel hidden">
-          <div class="section-heading">
-            <h2>Administrativo</h2>
-            <div class="admin-actions">
-              <a href="/api/admin/export.csv" class="button" download>Baixar Relatorio (.csv)</a>
+        <!-- Visualização do Colaborador (Padrão) -->
+        <div id="employeeView" class="view-container">
+          <section class="status-card">
+            <div>
+              <span class="eyebrow">Localizacao</span>
+              <strong id="locationStatus">Aguardando permissao</strong>
             </div>
-          </div>
+            <span id="radiusBadge" class="badge">Raio</span>
+          </section>
+
+          <section class="punch-actions" aria-label="Registrar ponto">
+            <button id="clockInButton" class="punch-button in" type="button">
+              <span>Entrada</span>
+              <small>Trabalho</small>
+            </button>
+            <button id="intervalInButton" class="punch-button interval-in" type="button">
+              <span>Iniciar</span>
+              <small>Intervalo</small>
+            </button>
+            <button id="intervalOutButton" class="punch-button interval-out" type="button">
+              <span>Finalizar</span>
+              <small>Intervalo</small>
+            </button>
+            <button id="clockOutButton" class="punch-button out" type="button">
+              <span>Saída</span>
+              <small>Trabalho</small>
+            </button>
+          </section>
+
+          <p id="appMessage" class="message" role="status"></p>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Ultimos registros</h2>
+              <button id="refreshButton" class="text-button" type="button">Atualizar</button>
+            </div>
+            <div id="punchList" class="punch-list"></div>
+          </section>
+        </div>
+
+        <!-- Visualização do Administrador -->
+        <div id="adminView" class="view-container hidden">
           
-          <div class="admin-users-section">
-            <h3>Cadastrar Novo Usuário</h3>
-            <form id="newUserForm" class="user-form">
-              <input type="text" name="name" placeholder="Nome Completo" required />
-              <input type="text" name="code" placeholder="Código (ex: colab02)" required />
-              <input type="text" name="pin" placeholder="Senha (PIN)" required />
-              <select name="role">
-                <option value="employee">Colaborador</option>
-                <option value="admin">Administrador</option>
-              </select>
-              <button type="submit" class="button secondary">Adicionar</button>
-            </form>
-            <div id="newUserMessage" class="message hidden"></div>
+          <!-- Aba 1: Painel Geral -->
+          <section id="tab-dashboard" class="tab-content">
+            <div class="dashboard-header-actions">
+              <h2>Visão Geral do Dia</h2>
+              <a href="/api/admin/export.csv" class="button text-button" download>Exportar Planilha (.csv)</a>
+            </div>
             
-            <h3 style="margin-top: 2rem;">Usuários Cadastrados</h3>
-            <div id="adminUserList" class="user-list"></div>
-          </div>
-          <div id="adminSummary" class="summary-grid"></div>
-        </section>
+            <div id="adminSummary" class="summary-grid"></div>
+
+            <section class="panel dashboard-activity">
+              <div class="section-heading">
+                <h2>Registros de Hoje</h2>
+                <button id="refreshDashboardBtn" class="text-button" type="button">Atualizar</button>
+              </div>
+              <div id="dashboardRecentList" class="punch-list">
+                <!-- Mostra pontos de hoje -->
+              </div>
+            </section>
+          </section>
+
+          <!-- Aba 2: Espelho de Ponto -->
+          <section id="tab-punches" class="tab-content hidden">
+            <div class="panel">
+              <div class="section-heading flex-wrap">
+                <h2>Consulta e Espelho de Ponto</h2>
+                <button id="btnOpenManualPunch" class="button primary-button-sm" type="button">Bater Ponto Manual</button>
+              </div>
+              
+              <div class="filters-grid">
+                <div class="filter-item">
+                  <label for="filterSearch">Colaborador</label>
+                  <input type="text" id="filterSearch" placeholder="Pesquisar nome ou código...">
+                </div>
+                <div class="filter-item">
+                  <label for="filterDate">Período</label>
+                  <select id="filterDate">
+                    <option value="today">Hoje</option>
+                    <option value="yesterday">Ontem</option>
+                    <option value="week">Últimos 7 dias</option>
+                    <option value="month">Este Mês</option>
+                    <option value="all" selected>Todo o Histórico</option>
+                  </select>
+                </div>
+                <div class="filter-item">
+                  <label for="filterType">Tipo de Ponto</label>
+                  <select id="filterType">
+                    <option value="all" selected>Todos</option>
+                    <option value="in">Entrada Trabalho</option>
+                    <option value="interval_in">Entrada Intervalo</option>
+                    <option value="interval_out">Saída Intervalo</option>
+                    <option value="out">Saída Trabalho</option>
+                  </select>
+                </div>
+                <div class="filter-item">
+                  <label for="filterStatus">Status</label>
+                  <select id="filterStatus">
+                    <option value="all" selected>Todos</option>
+                    <option value="approved">Aprovados</option>
+                    <option value="rejected">Recusados</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="punches-table">
+                  <thead>
+                    <tr>
+                      <th>Colaborador</th>
+                      <th>Data/Hora</th>
+                      <th>Tipo</th>
+                      <th>Status</th>
+                      <th>Localização</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminPunchesTableBody">
+                    <!-- Preenchido via Javascript -->
+                  </tbody>
+                </table>
+                <div id="adminPunchesEmpty" class="empty hidden">Nenhum registro encontrado com os filtros selecionados.</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Aba 3: Colaboradores -->
+          <section id="tab-users" class="tab-content hidden">
+            <div class="panel">
+              <h2>Cadastrar Novo Usuário</h2>
+              <form id="newUserForm" class="user-form">
+                <input type="text" name="name" placeholder="Nome Completo" required />
+                <input type="text" name="code" placeholder="Código (ex: colab02)" required />
+                <input type="text" name="pin" placeholder="Senha (PIN)" required />
+                <select name="role">
+                  <option value="employee">Colaborador</option>
+                  <option value="admin">Administrador</option>
+                </select>
+                <button type="submit" class="button primary-button-sm">Adicionar Usuário</button>
+              </form>
+              <div id="newUserMessage" class="message hidden"></div>
+            </div>
+
+            <section class="panel" style="margin-top: 1.5rem;">
+              <h2>Usuários Cadastrados</h2>
+              <div id="adminUserList" class="user-list"></div>
+            </section>
+          </section>
+
+          <!-- Aba 4: Ponto do Admin (Pessoal) -->
+          <section id="tab-my-punch" class="tab-content hidden">
+            <section class="status-card admin-personal-status">
+              <div>
+                <span class="eyebrow">Sua Localização</span>
+                <strong id="adminLocationStatus">Aguardando permissão</strong>
+              </div>
+              <span id="adminRadiusBadge" class="badge">Raio</span>
+            </section>
+
+            <section class="punch-actions" aria-label="Registrar ponto do administrador">
+              <button id="adminClockInButton" class="punch-button in" type="button">
+                <span>Entrada</span>
+                <small>Trabalho</small>
+              </button>
+              <button id="adminIntervalInButton" class="punch-button interval-in" type="button">
+                <span>Iniciar</span>
+                <small>Intervalo</small>
+              </button>
+              <button id="adminIntervalOutButton" class="punch-button interval-out" type="button">
+                <span>Finalizar</span>
+                <small>Intervalo</small>
+              </button>
+              <button id="adminClockOutButton" class="punch-button out" type="button">
+                <span>Saída</span>
+                <small>Trabalho</small>
+              </button>
+            </section>
+            
+            <p id="adminAppMessage" class="message" role="status"></p>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Seus registros recentes</h2>
+                <button id="adminRefreshButton" class="text-button" type="button">Atualizar</button>
+              </div>
+              <div id="adminPunchList" class="punch-list"></div>
+            </section>
+          </section>
+        </div>
       </section>
     </main>
+
+    <!-- Modal de Registro de Ponto Manual -->
+    <div id="manualPunchModal" class="modal hidden">
+      <div class="modal-content panel">
+        <div class="modal-header">
+          <h2>Registrar Ponto Manual</h2>
+          <button id="btnCloseManualPunch" class="close-modal-btn" type="button">&times;</button>
+        </div>
+        <form id="manualPunchForm">
+          <label>
+            Colaborador
+            <select name="userId" id="manualPunchUserSelect" required>
+              <!-- Preenchido via Javascript -->
+            </select>
+          </label>
+          <div class="form-row">
+            <label>
+              Data
+              <input type="date" name="date" required>
+            </label>
+            <label>
+              Hora
+              <input type="time" name="time" step="1" required>
+            </label>
+          </div>
+          <label>
+            Tipo de Registro
+            <select name="type" required>
+              <option value="in">Entrada Trabalho</option>
+              <option value="interval_in">Entrada Intervalo (Início)</option>
+              <option value="interval_out">Saída Intervalo (Fim)</option>
+              <option value="out">Saída Trabalho</option>
+            </select>
+          </label>
+          <label>
+            Justificativa / Motivo
+            <input type="text" name="reason" placeholder="Ex: Problema no celular, erro de geolocalização" required>
+          </label>
+          <button class="primary-button" type="submit">Salvar Registro</button>
+          <p id="manualPunchMessage" class="message" role="status"></p>
+        </form>
+      </div>
+    </div>
+
     <script src="/app.js" defer></script>
   </body>
 </html>
