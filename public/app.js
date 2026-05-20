@@ -17,7 +17,7 @@ function requestNotificationPermission() {
 function updateButtonStates() {
   if (!state.user) return;
   const today = new Date().toLocaleDateString("pt-BR");
-  const myPunches = state.punches.filter(p => p.userId === state.user.id && new Date(p.createdAt).toLocaleDateString("pt-BR") === today);
+  const myPunches = state.punches.filter(p => p.userId === state.user.id && p.status === "approved" && new Date(p.createdAt).toLocaleDateString("pt-BR") === today);
   const lastPunch = myPunches[0]?.type;
 
   elements.clockInButton.disabled = true;
@@ -84,6 +84,12 @@ const elements = {
   filterStatus: document.querySelector("#filterStatus"),
   adminPunchesTableBody: document.querySelector("#adminPunchesTableBody"),
   adminPunchesEmpty: document.querySelector("#adminPunchesEmpty"),
+  editPunchModal: document.querySelector("#editPunchModal"),
+  editPunchForm: document.querySelector("#editPunchForm"),
+  btnCloseEditPunch: document.querySelector("#btnCloseEditPunch"),
+  editPunchMessage: document.querySelector("#editPunchMessage"),
+  editPunchUserDisplay: document.querySelector("#editPunchUserDisplay"),
+  editPunchAuditTrail: document.querySelector("#editPunchAuditTrail"),
   
   // Elementos do Ponto do Administrador (Pessoal)
   adminLocationStatus: document.querySelector("#adminLocationStatus"),
@@ -546,6 +552,16 @@ function renderAdminPunchesTable() {
       details = punch.reason || "Fora do raio/sem precisão";
     }
     
+    let editedBadge = "";
+    if (punch.originalCreatedAt) {
+      const origDate = new Date(punch.originalCreatedAt);
+      const origTypeLabel = typeLabels[punch.originalType] || "Ponto";
+      const origStatusLabel = punch.originalStatus === "approved" ? "Aprovado" : "Recusado";
+      const origDetail = punch.originalReason || "";
+      const tooltip = `Original:\nData/Hora: ${origDate.toLocaleString("pt-BR")}\nTipo: ${origTypeLabel}\nStatus: ${origStatusLabel}\nMotivo: ${origDetail}`;
+      editedBadge = `<br><span class="badge-edited" title="${escapeHtml(tooltip)}">✏️ Editado</span>`;
+    }
+
     const mapsLink = punch.latitude && punch.longitude
       ? `<a href="https://www.google.com/maps/search/?api=1&query=${punch.latitude},${punch.longitude}" target="_blank" class="btn-map" title="Ver localização no mapa">📍 Mapa</a>`
       : `<span>Sem GPS</span>`;
@@ -569,6 +585,7 @@ function renderAdminPunchesTable() {
         </td>
         <td data-label="Status">
           <span class="status-pill ${statusClass}">${statusLabel}</span>
+          ${editedBadge}
         </td>
         <td data-label="Localização">
           <strong>${details}</strong>
@@ -577,6 +594,9 @@ function renderAdminPunchesTable() {
         <td data-label="Ações">
           <button onclick="overridePunchStatus('${punch.id}', '${toggleTargetStatus}')" class="btn-action-table ${toggleClass}">
             ${toggleLabel}
+          </button>
+          <button onclick="openEditPunchModal('${punch.id}')" class="btn-action-table edit" title="Editar registro de ponto">
+            Editar
           </button>
           <button onclick="deletePunch('${punch.id}')" class="btn-action-table delete" title="Excluir ponto permanentemente">
             Excluir
@@ -630,7 +650,7 @@ function renderAdminPersonalPunch() {
 function updateAdminPersonalButtonStates() {
   if (!state.user) return;
   const today = new Date().toLocaleDateString("pt-BR");
-  const myPunches = state.punches.filter(p => p.userId === state.user.id && new Date(p.createdAt).toLocaleDateString("pt-BR") === today);
+  const myPunches = state.punches.filter(p => p.userId === state.user.id && p.status === "approved" && new Date(p.createdAt).toLocaleDateString("pt-BR") === today);
   const lastPunch = myPunches[0]?.type;
 
   elements.adminClockInButton.disabled = true;
@@ -759,6 +779,93 @@ if (elements.btnOpenManualPunch) {
 if (elements.btnCloseManualPunch) {
   elements.btnCloseManualPunch.addEventListener("click", () => {
     elements.manualPunchModal.classList.add("hidden");
+  });
+}
+
+window.openEditPunchModal = (punchId) => {
+  const punch = state.punches.find(p => p.id === punchId);
+  if (!punch) return;
+
+  elements.editPunchForm.querySelector('input[name="punchId"]').value = punchId;
+  elements.editPunchUserDisplay.value = `${punch.userName} (${punch.userCode})`;
+  
+  const localDate = new Date(punch.createdAt);
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getDate()).padStart(2, '0');
+  elements.editPunchForm.querySelector('input[name="date"]').value = `${year}-${month}-${day}`;
+  
+  const hours = String(localDate.getHours()).padStart(2, '0');
+  const minutes = String(localDate.getMinutes()).padStart(2, '0');
+  const seconds = String(localDate.getSeconds()).padStart(2, '0');
+  elements.editPunchForm.querySelector('input[name="time"]').value = `${hours}:${minutes}:${seconds}`;
+  
+  elements.editPunchForm.querySelector('select[name="type"]').value = punch.type;
+  elements.editPunchForm.querySelector('select[name="status"]').value = punch.status;
+  elements.editPunchForm.querySelector('input[name="reason"]').value = punch.reason || "";
+  
+  if (punch.originalCreatedAt) {
+    const origDate = new Date(punch.originalCreatedAt);
+    const typeLabels = {
+      "in": "Entrada Trab.",
+      "interval_in": "Entrada Int.",
+      "interval_out": "Saída Int.",
+      "out": "Saída Trab."
+    };
+    elements.editPunchAuditTrail.innerHTML = `
+      <strong>Histórico de Auditoria:</strong><br>
+      Editado por: ${escapeHtml(punch.editedBy)} em ${new Date(punch.editedAt).toLocaleString("pt-BR")}<br>
+      Valores Originais:<br>
+      - Data/Hora: ${origDate.toLocaleString("pt-BR")}<br>
+      - Tipo: ${typeLabels[punch.originalType] || "Ponto"}<br>
+      - Status: ${punch.originalStatus === "approved" ? "Aprovado" : "Recusado"}<br>
+      - Justificativa: ${escapeHtml(punch.originalReason || "Nenhuma")}
+    `;
+    elements.editPunchAuditTrail.classList.remove("hidden");
+  } else {
+    elements.editPunchAuditTrail.innerHTML = "";
+    elements.editPunchAuditTrail.classList.add("hidden");
+  }
+  
+  elements.editPunchMessage.classList.add("hidden");
+  elements.editPunchModal.classList.remove("hidden");
+};
+
+if (elements.btnCloseEditPunch) {
+  elements.btnCloseEditPunch.addEventListener("click", () => {
+    elements.editPunchModal.classList.add("hidden");
+  });
+}
+
+if (elements.editPunchForm) {
+  elements.editPunchForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setMessage(elements.editPunchMessage, "Salvando alterações...");
+    elements.editPunchMessage.classList.remove("hidden");
+    
+    const form = new FormData(elements.editPunchForm);
+    const punchId = form.get("punchId");
+    const date = form.get("date");
+    const time = form.get("time");
+    const type = form.get("type");
+    const status = form.get("status");
+    const reason = form.get("reason");
+    
+    const createdAt = new Date(`${date}T${time}`).toISOString();
+    
+    try {
+      await api("/api/admin/punches", {
+        method: "PUT",
+        body: JSON.stringify({ action: "edit", punchId, createdAt, type, status, reason })
+      });
+      setMessage(elements.editPunchMessage, "Alterações salvas com sucesso!", "success");
+      await loadPunches();
+      setTimeout(() => {
+        elements.editPunchModal.classList.add("hidden");
+      }, 1500);
+    } catch (error) {
+      setMessage(elements.editPunchMessage, error.message, "error");
+    }
   });
 }
 

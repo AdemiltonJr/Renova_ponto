@@ -821,6 +821,40 @@ input:focus {
 .btn-action-table.delete:hover {
   background: #FEE2E2;
 }
+.btn-action-table.edit {
+  background: rgba(46, 91, 153, 0.08);
+  color: var(--brand-blue);
+}
+.btn-action-table.edit:hover {
+  background: rgba(46, 91, 153, 0.16);
+}
+
+.badge-edited {
+  display: inline-block;
+  padding: 2px 6px;
+  background-color: #FEF3C7; /* yellow-100 */
+  color: #D97706; /* yellow-600 */
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 4px;
+  cursor: help;
+}
+
+.audit-trail {
+  padding: 12px;
+  background: #F8FAFC;
+  border: 1px dashed var(--line);
+  border-radius: var(--border-radius-sm);
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+.audit-trail strong {
+  color: var(--brand-blue-dark);
+}
 
 .modal {
   position: fixed;

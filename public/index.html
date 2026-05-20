@@ -62,19 +62,19 @@
           </section>
 
           <section class="punch-actions" aria-label="Registrar ponto">
-            <button id="clockInButton" class="punch-button in" type="button">
+            <button id="clockInButton" class="punch-button in" type="button" disabled>
               <span>Entrada</span>
               <small>Trabalho</small>
             </button>
-            <button id="intervalInButton" class="punch-button interval-in" type="button">
+            <button id="intervalInButton" class="punch-button interval-in" type="button" disabled>
               <span>Iniciar</span>
               <small>Intervalo</small>
             </button>
-            <button id="intervalOutButton" class="punch-button interval-out" type="button">
+            <button id="intervalOutButton" class="punch-button interval-out" type="button" disabled>
               <span>Finalizar</span>
               <small>Intervalo</small>
             </button>
-            <button id="clockOutButton" class="punch-button out" type="button">
+            <button id="clockOutButton" class="punch-button out" type="button" disabled>
               <span>Saída</span>
               <small>Trabalho</small>
             </button>
@@ -212,19 +212,19 @@
             </section>
 
             <section class="punch-actions" aria-label="Registrar ponto do administrador">
-              <button id="adminClockInButton" class="punch-button in" type="button">
+              <button id="adminClockInButton" class="punch-button in" type="button" disabled>
                 <span>Entrada</span>
                 <small>Trabalho</small>
               </button>
-              <button id="adminIntervalInButton" class="punch-button interval-in" type="button">
+              <button id="adminIntervalInButton" class="punch-button interval-in" type="button" disabled>
                 <span>Iniciar</span>
                 <small>Intervalo</small>
               </button>
-              <button id="adminIntervalOutButton" class="punch-button interval-out" type="button">
+              <button id="adminIntervalOutButton" class="punch-button interval-out" type="button" disabled>
                 <span>Finalizar</span>
                 <small>Intervalo</small>
               </button>
-              <button id="adminClockOutButton" class="punch-button out" type="button">
+              <button id="adminClockOutButton" class="punch-button out" type="button" disabled>
                 <span>Saída</span>
                 <small>Trabalho</small>
               </button>
@@ -283,6 +283,60 @@
           </label>
           <button class="primary-button" type="submit">Salvar Registro</button>
           <p id="manualPunchMessage" class="message" role="status"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal de Edição de Ponto (Apenas Administradores) -->
+    <div id="editPunchModal" class="modal hidden">
+      <div class="modal-content panel">
+        <div class="modal-header">
+          <h2>Editar Registro de Ponto</h2>
+          <button id="btnCloseEditPunch" class="close-modal-btn" type="button">&times;</button>
+        </div>
+        <form id="editPunchForm">
+          <input type="hidden" name="punchId">
+          <label>
+            Colaborador
+            <input type="text" id="editPunchUserDisplay" disabled style="background-color: #f1f5f9; color: var(--muted); border-color: var(--line);">
+          </label>
+          <div class="form-row">
+            <label>
+              Data
+              <input type="date" name="date" required>
+            </label>
+            <label>
+              Hora
+              <input type="time" name="time" step="1" required>
+            </label>
+          </div>
+          <label>
+            Tipo de Registro
+            <select name="type" required style="width: 100%; padding: 16px; border: 2px solid var(--line); border-radius: var(--border-radius-sm); font-size: 16px; font-weight: 500; outline: none; background: var(--panel);">
+              <option value="in">Entrada Trabalho</option>
+              <option value="interval_in">Entrada Intervalo (Início)</option>
+              <option value="interval_out">Saída Intervalo (Fim)</option>
+              <option value="out">Saída Trabalho</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select name="status" required style="width: 100%; padding: 16px; border: 2px solid var(--line); border-radius: var(--border-radius-sm); font-size: 16px; font-weight: 500; outline: none; background: var(--panel);">
+              <option value="approved">Aprovado</option>
+              <option value="rejected">Recusado</option>
+            </select>
+          </label>
+          <label>
+            Justificativa / Motivo
+            <input type="text" name="reason" placeholder="Ex: Ajuste solicitado pelo colaborador" required>
+          </label>
+          
+          <div id="editPunchAuditTrail" class="audit-trail hidden">
+            <!-- Informações sobre edições anteriores -->
+          </div>
+          
+          <button class="primary-button" type="submit">Salvar Alterações</button>
+          <p id="editPunchMessage" class="message" role="status"></p>
         </form>
       </div>
     </div>
