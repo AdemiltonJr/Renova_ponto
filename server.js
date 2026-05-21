@@ -235,16 +235,46 @@ async function handleApi(req, res, url) {
   if (!user) return send(res, 401, { error: "Sessao expirada. Entre novamente." });
 
   if (url.pathname === "/api/me") {
-    return send(res, 200, {
-      user: publicUser(user),
-      config: {
-        schoolName: config.schoolName,
-        schoolLatitude: config.schoolLatitude,
-        schoolLongitude: config.schoolLongitude,
-        allowedRadiusMeters: config.allowedRadiusMeters,
-        maxAccuracyMeters: config.maxAccuracyMeters,
-      },
-    });
+    if (req.method === "GET") {
+      return send(res, 200, {
+        user: publicUser(user),
+        config: {
+          schoolName: config.schoolName,
+          schoolLatitude: config.schoolLatitude,
+          schoolLongitude: config.schoolLongitude,
+          allowedRadiusMeters: config.allowedRadiusMeters,
+          maxAccuracyMeters: config.maxAccuracyMeters,
+        },
+      });
+    }
+
+    if (req.method === "PUT") {
+      const body = await readBody(req);
+      const name = String(body.name || "").trim();
+      const pin = String(body.pin || "").trim();
+
+      if (!name) return send(res, 400, { error: "O nome é obrigatório." });
+
+      const users = await readJson(USERS_FILE, []);
+      const dbUser = users.find((u) => u.id === user.id);
+      if (!dbUser) return send(res, 404, { error: "Usuário não encontrado." });
+
+      dbUser.name = name;
+
+      if (pin) {
+        const { salt, hash } = await hashPin(pin);
+        dbUser.salt = salt;
+        dbUser.pinHash = hash;
+
+        const currentToken = parseCookies(req).renova_session;
+        const sessions = await readJson(SESSIONS_FILE, []);
+        const filteredSessions = sessions.filter((s) => s.userId !== user.id || s.token === currentToken);
+        await writeJson(SESSIONS_FILE, filteredSessions);
+      }
+
+      await writeJson(USERS_FILE, users);
+      return send(res, 200, { user: publicUser(dbUser) });
+    }
   }
 
   if (url.pathname === "/api/punches" && req.method === "GET") {

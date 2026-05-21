@@ -40,7 +40,10 @@
               <h1 id="helloTitle">Ponto</h1>
             </div>
           </div>
-          <button id="logoutButton" class="icon-button" type="button" title="Sair" aria-label="Sair">Sair</button>
+          <div style="display: flex; gap: 8px;">
+            <button id="editProfileButton" class="icon-button" type="button" title="Editar Perfil" aria-label="Editar Perfil">Perfil</button>
+            <button id="logoutButton" class="icon-button" type="button" title="Sair" aria-label="Sair">Sair</button>
+          </div>
         </header>
 
         <!-- Menu de Abas Administrativas -->
@@ -371,6 +374,28 @@
           </label>
           <button class="primary-button" type="submit">Salvar Alterações</button>
           <p id="editUserMessage" class="message" role="status"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal de Autogerenciamento de Perfil (Colaborador / Admin) -->
+    <div id="selfProfileModal" class="modal hidden">
+      <div class="modal-content panel">
+        <div class="modal-header">
+          <h2>Meu Perfil</h2>
+          <button id="btnCloseSelfProfile" class="close-modal-btn" type="button">&times;</button>
+        </div>
+        <form id="selfProfileForm">
+          <label>
+            Nome Completo
+            <input type="text" name="name" required>
+          </label>
+          <label>
+            Nova Senha / PIN (opcional)
+            <input type="password" name="pin" placeholder="Deixe em branco para manter a atual">
+          </label>
+          <button class="primary-button" type="submit">Salvar Alterações</button>
+          <p id="selfProfileMessage" class="message" role="status"></p>
         </form>
       </div>
     </div>

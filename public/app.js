@@ -74,6 +74,11 @@ const elements = {
   editUserForm: document.querySelector("#editUserForm"),
   editUserMessage: document.querySelector("#editUserMessage"),
   btnCloseEditUser: document.querySelector("#btnCloseEditUser"),
+  editProfileButton: document.querySelector("#editProfileButton"),
+  selfProfileModal: document.querySelector("#selfProfileModal"),
+  selfProfileForm: document.querySelector("#selfProfileForm"),
+  selfProfileMessage: document.querySelector("#selfProfileMessage"),
+  btnCloseSelfProfile: document.querySelector("#btnCloseSelfProfile"),
   
   // Elementos da Aba de Espelho de Ponto
   btnOpenManualPunch: document.querySelector("#btnOpenManualPunch"),
@@ -942,6 +947,50 @@ if (elements.editUserForm) {
       }, 1500);
     } catch (error) {
       setMessage(elements.editUserMessage, error.message, "error");
+    }
+  });
+}
+
+if (elements.editProfileButton) {
+  elements.editProfileButton.addEventListener("click", () => {
+    if (!state.user) return;
+    elements.selfProfileForm.querySelector('input[name="name"]').value = state.user.name;
+    elements.selfProfileForm.querySelector('input[name="pin"]').value = "";
+    elements.selfProfileMessage.classList.add("hidden");
+    elements.selfProfileModal.classList.remove("hidden");
+  });
+}
+
+if (elements.btnCloseSelfProfile) {
+  elements.btnCloseSelfProfile.addEventListener("click", () => {
+    elements.selfProfileModal.classList.add("hidden");
+  });
+}
+
+if (elements.selfProfileForm) {
+  elements.selfProfileForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setMessage(elements.selfProfileMessage, "Salvando alterações...");
+    elements.selfProfileMessage.classList.remove("hidden");
+    
+    const form = new FormData(elements.selfProfileForm);
+    const name = form.get("name");
+    const pin = form.get("pin");
+    
+    try {
+      const payload = await api("/api/me", {
+        method: "PUT",
+        body: JSON.stringify({ name, pin })
+      });
+      state.user = payload.user;
+      showApp();
+      
+      setMessage(elements.selfProfileMessage, "Perfil atualizado com sucesso!", "success");
+      setTimeout(() => {
+        elements.selfProfileModal.classList.add("hidden");
+      }, 1500);
+    } catch (error) {
+      setMessage(elements.selfProfileMessage, error.message, "error");
     }
   });
 }
