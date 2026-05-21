@@ -70,6 +70,10 @@ const elements = {
   adminUserList: document.querySelector("#adminUserList"),
   refreshDashboardBtn: document.querySelector("#refreshDashboardBtn"),
   dashboardRecentList: document.querySelector("#dashboardRecentList"),
+  editUserModal: document.querySelector("#editUserModal"),
+  editUserForm: document.querySelector("#editUserForm"),
+  editUserMessage: document.querySelector("#editUserMessage"),
+  btnCloseEditUser: document.querySelector("#btnCloseEditUser"),
   
   // Elementos da Aba de Espelho de Ponto
   btnOpenManualPunch: document.querySelector("#btnOpenManualPunch"),
@@ -294,43 +298,74 @@ async function loadAdminUsers() {
 
 function renderAdminUsers(users) {
   if (!elements.adminUserList) return;
-  elements.adminUserList.innerHTML = users.map(u => `
-    <div class="user-card ${!u.active ? 'inactive' : ''}">
-      <div class="user-card-info">
-        <strong>${escapeHtml(u.name)} <small>(${u.role === 'admin' ? 'Admin' : 'Colab'})</small></strong>
-        <span>Código: ${escapeHtml(u.code)} | Status: ${u.active ? 'Ativo' : 'Inativo'}</span>
+  const currentUserId = state.user?.id;
+  
+  elements.adminUserList.innerHTML = users.map(u => {
+    const isSelf = u.id === currentUserId;
+    const activeLabel = u.active ? 'Inativar' : 'Ativar';
+    const activeClass = !u.active ? 'action-inactive' : '';
+    
+    return `
+      <div class="user-card ${!u.active ? 'inactive' : ''}">
+        <div class="user-card-info">
+          <strong>${escapeHtml(u.name)} <small>(${u.role === 'admin' ? 'Admin' : 'Colab'})</small></strong>
+          <span>Código: ${escapeHtml(u.code)} | Status: ${u.active ? 'Ativo' : 'Inativo'}</span>
+        </div>
+        <div class="user-card-actions">
+          <button onclick="openEditUserModal('${u.id}')" class="btn-edit">Editar</button>
+          <button onclick="toggleUserActive('${u.id}')" class="${activeClass}" ${isSelf ? 'disabled title="Você não pode se inativar"' : ''}>
+            ${activeLabel}
+          </button>
+          <button onclick="deleteUser('${u.id}')" class="btn-delete" ${isSelf ? 'disabled title="Você não pode se excluir"' : ''}>
+            Excluir
+          </button>
+        </div>
       </div>
-      <div class="user-card-actions">
-        <button onclick="changeUserPin('${u.id}')">Trocar PIN</button>
-        <button onclick="toggleUserActive('${u.id}')" class="${!u.active ? 'action-inactive' : ''}">
-          ${u.active ? 'Inativar' : 'Ativar'}
-        </button>
-      </div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
-window.changeUserPin = async (userId) => {
-  const newPin = prompt("Digite o novo PIN (senha) para este usuário:");
-  if (!newPin) return;
+window.openEditUserModal = (userId) => {
+  const user = state.users.find(u => u.id === userId);
+  if (!user) return;
+
+  elements.editUserForm.querySelector('input[name="userId"]').value = userId;
+  elements.editUserForm.querySelector('input[name="name"]').value = user.name;
+  elements.editUserForm.querySelector('input[name="code"]').value = user.code;
+  elements.editUserForm.querySelector('select[name="role"]').value = user.role;
+  elements.editUserForm.querySelector('input[name="pin"]').value = "";
+
+  elements.editUserMessage.classList.add("hidden");
+  elements.editUserModal.classList.remove("hidden");
+};
+
+window.toggleUserActive = async (userId) => {
+  if (userId === state.user?.id) {
+    alert("Você não pode inativar a si mesmo!");
+    return;
+  }
   try {
     await api("/api/admin/users", {
       method: "PUT",
-      body: JSON.stringify({ id: userId, action: "pin", pin: newPin })
+      body: JSON.stringify({ id: userId, action: "toggle_active" })
     });
-    alert("PIN alterado com sucesso!");
     loadAdminUsers();
   } catch (error) {
     alert("Erro: " + error.message);
   }
 };
 
-window.toggleUserActive = async (userId) => {
+window.deleteUser = async (userId) => {
+  if (userId === state.user?.id) {
+    alert("Você não pode excluir a si mesmo!");
+    return;
+  }
+  if (!confirm("Tem certeza que deseja excluir permanentemente este usuário? Todos os acessos futuros serão desativados. Os registros de ponto já realizados serão mantidos.")) return;
   try {
-    await api("/api/admin/users", {
-      method: "PUT",
-      body: JSON.stringify({ id: userId, action: "toggle_active" })
+    await api(`/api/admin/users?id=${encodeURIComponent(userId)}`, {
+      method: "DELETE"
     });
+    alert("Usuário excluído com sucesso!");
     loadAdminUsers();
   } catch (error) {
     alert("Erro: " + error.message);
@@ -865,6 +900,48 @@ if (elements.editPunchForm) {
       }, 1500);
     } catch (error) {
       setMessage(elements.editPunchMessage, error.message, "error");
+    }
+  });
+}
+
+if (elements.btnCloseEditUser) {
+  elements.btnCloseEditUser.addEventListener("click", () => {
+    elements.editUserModal.classList.add("hidden");
+  });
+}
+
+if (elements.editUserForm) {
+  elements.editUserForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setMessage(elements.editUserMessage, "Salvando alterações...");
+    elements.editUserMessage.classList.remove("hidden");
+    
+    const form = new FormData(elements.editUserForm);
+    const userId = form.get("userId");
+    const name = form.get("name");
+    const code = form.get("code");
+    const role = form.get("role");
+    const pin = form.get("pin");
+    
+    try {
+      await api("/api/admin/users", {
+        method: "PUT",
+        body: JSON.stringify({ action: "edit", id: userId, name, code, role, pin })
+      });
+      setMessage(elements.editUserMessage, "Alterações salvas com sucesso!", "success");
+      
+      if (userId === state.user?.id) {
+        const me = await api("/api/me");
+        state.user = me.user;
+        showApp();
+      }
+      
+      await loadAdminUsers();
+      setTimeout(() => {
+        elements.editUserModal.classList.add("hidden");
+      }, 1500);
+    } catch (error) {
+      setMessage(elements.editUserMessage, error.message, "error");
     }
   });
 }

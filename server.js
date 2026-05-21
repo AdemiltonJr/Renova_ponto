@@ -308,24 +308,85 @@ async function handleApi(req, res, url) {
     if (req.method === "PUT") {
       const body = await readBody(req);
       const targetId = body.id;
-      const newPin = body.pin;
       const action = body.action;
 
       const users = await readJson(USERS_FILE, []);
       const targetUser = users.find((u) => u.id === targetId);
-      if (!targetUser) return send(res, 404, { error: "Usuario nao encontrado." });
+      if (!targetUser) return send(res, 404, { error: "Usuário não encontrado." });
 
       if (action === "pin") {
-        if (!newPin) return send(res, 400, { error: "PIN obrigatorio." });
+        const newPin = body.pin;
+        if (!newPin) return send(res, 400, { error: "PIN obrigatório." });
         const { salt, hash } = await hashPin(newPin);
         targetUser.salt = salt;
         targetUser.pinHash = hash;
       } else if (action === "toggle_active") {
+        if (targetId === user.id) {
+          return send(res, 400, { error: "Você não pode inativar seu próprio usuário." });
+        }
         targetUser.active = !targetUser.active;
+        if (!targetUser.active) {
+          const sessions = await readJson(SESSIONS_FILE, []);
+          await writeJson(SESSIONS_FILE, sessions.filter((s) => s.userId !== targetId));
+        }
+      } else if (action === "edit") {
+        const name = String(body.name || "").trim();
+        const code = String(body.code || "").trim();
+        const role = body.role === "admin" ? "admin" : "employee";
+        const pin = String(body.pin || "").trim();
+
+        if (!name || !code) {
+          return send(res, 400, { error: "Nome e código são obrigatórios." });
+        }
+
+        if (users.some((u) => u.id !== targetId && u.code.toLowerCase() === code.toLowerCase())) {
+          return send(res, 400, { error: "Este código já está em uso por outro usuário." });
+        }
+
+        if (targetId === user.id && role !== "admin") {
+          return send(res, 400, { error: "Você não pode alterar seu próprio perfil de Administrador para Colaborador." });
+        }
+
+        targetUser.name = name;
+        targetUser.code = code;
+        targetUser.role = role;
+
+        if (pin) {
+          const { salt, hash } = await hashPin(pin);
+          targetUser.salt = salt;
+          targetUser.pinHash = hash;
+          const sessions = await readJson(SESSIONS_FILE, []);
+          await writeJson(SESSIONS_FILE, sessions.filter((s) => s.userId !== targetId));
+        }
       }
 
       await writeJson(USERS_FILE, users);
       return send(res, 200, { user: publicUser(targetUser) });
+    }
+
+    if (req.method === "DELETE") {
+      let targetId = url.searchParams.get("id");
+      if (!targetId) {
+        const body = await readBody(req).catch(() => ({}));
+        targetId = body.id;
+      }
+      if (!targetId) return send(res, 400, { error: "ID obrigatório." });
+
+      if (targetId === user.id) {
+        return send(res, 400, { error: "Você não pode excluir seu próprio usuário." });
+      }
+
+      const users = await readJson(USERS_FILE, []);
+      const index = users.findIndex((u) => u.id === targetId);
+      if (index === -1) return send(res, 404, { error: "Usuário não encontrado." });
+
+      users.splice(index, 1);
+      await writeJson(USERS_FILE, users);
+
+      const sessions = await readJson(SESSIONS_FILE, []);
+      await writeJson(SESSIONS_FILE, sessions.filter((s) => s.userId !== targetId));
+
+      return send(res, 200, { success: true });
     }
   }
 

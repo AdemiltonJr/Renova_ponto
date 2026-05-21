@@ -349,10 +349,33 @@ input:focus {
   background: #E2E8F0;
   color: #334155;
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 .user-card-actions button.action-inactive {
   background: var(--brand-pink);
   color: white;
+}
+.user-card-actions button.btn-edit {
+  background: rgba(46, 91, 153, 0.08);
+  color: var(--brand-blue);
+}
+.user-card-actions button.btn-edit:hover {
+  background: rgba(46, 91, 153, 0.16);
+}
+.user-card-actions button.btn-delete {
+  background: #FEF2F2;
+  color: #DC2626;
+}
+.user-card-actions button.btn-delete:hover {
+  background: #FEE2E2;
+}
+.user-card-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.user-card-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 .user-card.inactive { opacity: 0.6; }
 

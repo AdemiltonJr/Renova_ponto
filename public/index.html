@@ -341,6 +341,40 @@
       </div>
     </div>
 
+    <!-- Modal de Edição de Usuário (Apenas Administradores) -->
+    <div id="editUserModal" class="modal hidden">
+      <div class="modal-content panel">
+        <div class="modal-header">
+          <h2>Editar Colaborador</h2>
+          <button id="btnCloseEditUser" class="close-modal-btn" type="button">&times;</button>
+        </div>
+        <form id="editUserForm">
+          <input type="hidden" name="userId">
+          <label>
+            Nome Completo
+            <input type="text" name="name" required>
+          </label>
+          <label>
+            Código (ex: colab02)
+            <input type="text" name="code" required>
+          </label>
+          <label>
+            Perfil / Cargo
+            <select name="role" style="width: 100%; padding: 16px; border: 2px solid var(--line); border-radius: var(--border-radius-sm); font-size: 16px; font-weight: 500; outline: none; background: var(--panel);">
+              <option value="employee">Colaborador</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </label>
+          <label>
+            Senha / PIN (opcional)
+            <input type="password" name="pin" placeholder="Deixe em branco para manter a atual">
+          </label>
+          <button class="primary-button" type="submit">Salvar Alterações</button>
+          <p id="editUserMessage" class="message" role="status"></p>
+        </form>
+      </div>
+    </div>
+
     <script src="/app.js" defer></script>
   </body>
 </html>
