@@ -452,6 +452,9 @@ input:focus {
 .punch-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-areas: 
+    "in out"
+    "int-in int-out";
   gap: 12px;
 }
 
@@ -461,9 +464,7 @@ input:focus {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-height: 100px;
   border-radius: var(--border-radius);
-  padding: 16px 8px;
   text-align: center;
   box-shadow: var(--shadow-sm);
   position: relative;
@@ -492,7 +493,6 @@ input:focus {
 }
 
 .punch-button span {
-  font-size: 22px;
   font-weight: 800;
   line-height: 1.1;
   position: relative;
@@ -500,13 +500,45 @@ input:focus {
 }
 
 .punch-button small {
-  font-size: 13px;
   font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 600;
   opacity: 0.9;
   position: relative;
   z-index: 3;
 }
+
+/* Button Sizing & Grid Areas */
+.punch-button.in {
+  grid-area: in;
+  min-height: 120px;
+  padding: 18px 10px;
+}
+.punch-button.in span { font-size: 23px; }
+.punch-button.in small { font-size: 13px; }
+
+.punch-button.out {
+  grid-area: out;
+  min-height: 120px;
+  padding: 18px 10px;
+}
+.punch-button.out span { font-size: 23px; }
+.punch-button.out small { font-size: 13px; }
+
+.punch-button.interval-in {
+  grid-area: int-in;
+  min-height: 75px;
+  padding: 10px 8px;
+}
+.punch-button.interval-in span { font-size: 18px; }
+.punch-button.interval-in small { font-size: 12px; }
+
+.punch-button.interval-out {
+  grid-area: int-out;
+  min-height: 75px;
+  padding: 10px 8px;
+}
+.punch-button.interval-out span { font-size: 18px; }
+.punch-button.interval-out small { font-size: 12px; }
 
 /* Active Button States */
 .punch-button.in:not(:disabled) {
