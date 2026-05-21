@@ -452,96 +452,108 @@ input:focus {
 .punch-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-areas: 
-    "in out"
-    "int-in int-out";
-  gap: 16px;
+  gap: 12px;
 }
-#clockInButton { grid-area: in; }
-#clockOutButton { grid-area: out; }
-#intervalInButton { grid-area: int-in; }
-#intervalOutButton { grid-area: int-out; }
 
 .punch-button {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 140px;
+  gap: 4px;
+  min-height: 100px;
   border-radius: var(--border-radius);
-  padding: 20px 10px;
+  padding: 16px 8px;
   text-align: center;
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
+  border: 2px solid transparent;
+  font-family: "Outfit", sans-serif;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .punch-button::after {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%);
   border-radius: inherit;
+  z-index: 2;
 }
 
-.punch-button:hover {
-  transform: translateY(-4px);
+.punch-button:hover:not(:disabled) {
+  transform: translateY(-3px);
   box-shadow: var(--shadow-lg);
 }
 
-.punch-button:active {
+.punch-button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
 .punch-button span {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.1;
   position: relative;
-  z-index: 1;
+  z-index: 3;
 }
 
 .punch-button small {
-  font-size: 14px;
+  font-size: 13px;
   font-family: "Plus Jakarta Sans", sans-serif;
   font-weight: 600;
   opacity: 0.9;
   position: relative;
-  z-index: 1;
+  z-index: 3;
 }
 
-.punch-button.in {
-  background: var(--brand-blue);
+/* Active Button States */
+.punch-button.in:not(:disabled) {
+  background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-blue-dark) 100%);
   color: white;
+  box-shadow: 0 8px 20px rgba(46, 91, 153, 0.25);
 }
 
-.punch-button.out {
-  background: var(--brand-pink);
+.punch-button.out:not(:disabled) {
+  background: linear-gradient(135deg, var(--brand-pink) 0%, var(--brand-pink-dark) 100%);
   color: white;
+  box-shadow: 0 8px 20px rgba(217, 115, 122, 0.25);
 }
 
-.punch-button.interval-in {
-  background: #F1F5F9;
+.punch-button.interval-in:not(:disabled) {
+  background: var(--panel);
   color: var(--brand-blue);
-  border: 2px solid #E2E8F0;
-  box-shadow: none;
-  min-height: 80px;
-  padding: 12px 8px;
+  border-color: var(--brand-blue);
+  box-shadow: 0 6px 16px rgba(46, 91, 153, 0.1);
 }
-.punch-button.interval-in span { font-size: 20px; }
-.punch-button.interval-in::after { display: none; }
 
-.punch-button.interval-out {
-  background: #F1F5F9;
+.punch-button.interval-out:not(:disabled) {
+  background: var(--panel);
   color: var(--brand-pink);
-  border: 2px solid #E2E8F0;
-  box-shadow: none;
-  min-height: 80px;
-  padding: 12px 8px;
+  border-color: var(--brand-pink);
+  box-shadow: 0 6px 16px rgba(217, 115, 122, 0.1);
 }
-.punch-button.interval-out span { font-size: 20px; }
-.punch-button.interval-out::after { display: none; }
+
+/* Disabled Button States (Unified & Soft) */
+.punch-button:disabled {
+  background: #F1F5F9 !important;
+  color: #94A3B8 !important;
+  border: 2px solid #E2E8F0 !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none !important;
+}
+
+.punch-button:disabled::after {
+  display: none !important;
+}
+
+.punch-button:disabled small {
+  color: #94A3B8 !important;
+  opacity: 0.7;
+}
 
 /* Punch List */
 .section-heading {
@@ -646,9 +658,6 @@ input:focus {
 }
 
 @media (max-width: 380px) {
-  .punch-actions {
-    grid-template-columns: 1fr;
-  }
   .summary-grid {
     grid-template-columns: 1fr;
   }
