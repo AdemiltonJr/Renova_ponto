@@ -330,7 +330,7 @@ function renderAdminSummary() {
     .join("");
 }
 
-async function loadAdminUsers() {
+async function loadAdminUsers(options = {}) {
   if (state.user?.role !== "admin") return;
   try {
     const payload = await api("/api/admin/users");
@@ -339,6 +339,7 @@ async function loadAdminUsers() {
     populateUserSelect();
   } catch (error) {
     console.error(error);
+    if (options.throwOnError) throw error;
   }
 }
 
@@ -552,6 +553,13 @@ async function punch(type, isAdminPersonal = false) {
 function populateUserSelect() {
   if (!elements.manualPunchUserSelect) return;
   const activeEmployees = state.users.filter(u => u.active && u.role === "employee");
+  if (!activeEmployees.length) {
+    elements.manualPunchUserSelect.disabled = true;
+    elements.manualPunchUserSelect.innerHTML = '<option value="">Nenhum colaborador ativo encontrado</option>';
+    return;
+  }
+
+  elements.manualPunchUserSelect.disabled = false;
   elements.manualPunchUserSelect.innerHTML = activeEmployees.map(u => `
     <option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.code)})</option>
   `).join("");
@@ -841,20 +849,29 @@ if (elements.filterSearch) {
 
 // Modal de Registro Manual
 if (elements.btnOpenManualPunch) {
-  elements.btnOpenManualPunch.addEventListener("click", () => {
+  elements.btnOpenManualPunch.addEventListener("click", async () => {
     elements.manualPunchModal.classList.remove("hidden");
     const now = new Date();
     const dateInput = elements.manualPunchForm.querySelector('input[name="date"]');
     const timeInput = elements.manualPunchForm.querySelector('input[name="time"]');
-    
-    dateInput.value = now.toISOString().slice(0, 10);
-    timeInput.value = now.toTimeString().slice(0, 8);
-    
+
     elements.manualPunchMessage.classList.add("hidden");
     elements.manualPunchForm.reset();
-    
+
     dateInput.value = now.toISOString().slice(0, 10);
     timeInput.value = now.toTimeString().slice(0, 8);
+
+    elements.manualPunchUserSelect.disabled = true;
+    elements.manualPunchUserSelect.innerHTML = '<option value="">Carregando colaboradores...</option>';
+
+    try {
+      await loadAdminUsers({ throwOnError: true });
+    } catch (error) {
+      console.error(error);
+      elements.manualPunchUserSelect.innerHTML = '<option value="">Nao foi possivel carregar colaboradores</option>';
+      setMessage(elements.manualPunchMessage, "Nao foi possivel carregar a lista de colaboradores.", "error");
+      elements.manualPunchMessage.classList.remove("hidden");
+    }
   });
 }
 
