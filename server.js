@@ -204,6 +204,52 @@ function validateLocation({ latitude, longitude, accuracy }) {
   return { ok: true, distance, accuracy: acc };
 }
 
+function applyAdminPunchEdit(punch, body, editor) {
+  const { createdAt, type, status, reason } = body;
+  if (!createdAt || !type || !status || !reason) {
+    return { ok: false, statusCode: 400, error: "Todos os campos (data, hora, tipo, status e justificativa) são obrigatórios." };
+  }
+
+  const validTypes = ["in", "interval_in", "interval_out", "out"];
+  if (!validTypes.includes(type)) {
+    return { ok: false, statusCode: 400, error: "Tipo de registro inválido." };
+  }
+
+  const validStatuses = ["approved", "rejected"];
+  if (!validStatuses.includes(status)) {
+    return { ok: false, statusCode: 400, error: "Status de registro inválido." };
+  }
+
+  const parsedDate = new Date(createdAt);
+  if (!Number.isFinite(parsedDate.getTime())) {
+    return { ok: false, statusCode: 400, error: "Data/hora inválida." };
+  }
+
+  const normalizedCreatedAt = parsedDate.toISOString();
+  const hasChanges =
+    new Date(punch.createdAt).getTime() !== parsedDate.getTime() ||
+    punch.type !== type ||
+    punch.status !== status ||
+    punch.reason !== reason;
+
+  if (hasChanges) {
+    if (!punch.originalCreatedAt) {
+      punch.originalCreatedAt = punch.createdAt;
+      punch.originalType = punch.type;
+      punch.originalStatus = punch.status;
+      punch.originalReason = punch.reason;
+    }
+    punch.createdAt = normalizedCreatedAt;
+    punch.type = type;
+    punch.status = status;
+    punch.reason = reason;
+    punch.editedAt = nowIso();
+    punch.editedBy = editor;
+  }
+
+  return { ok: true };
+}
+
 async function handleApi(req, res, url) {
   if (url.pathname === "/api/health") {
     return send(res, 200, { ok: true, name: config.schoolName });
@@ -423,6 +469,22 @@ async function handleApi(req, res, url) {
   if (url.pathname === "/api/admin/punches" && user.role === "admin") {
     if (req.method === "POST") {
       const body = await readBody(req);
+      if (body.punchId) {
+        const punches = await readJson(PUNCHES_FILE, []);
+        const punch = punches.find((p) => p.id === body.punchId);
+        if (!punch) {
+          return send(res, 404, { error: "Ponto não encontrado." });
+        }
+
+        const result = applyAdminPunchEdit(punch, body, `${user.name} (${user.code})`);
+        if (!result.ok) {
+          return send(res, result.statusCode, { error: result.error });
+        }
+
+        await writeJson(PUNCHES_FILE, punches);
+        return send(res, 200, { punch });
+      }
+
       const targetUserId = body.userId;
       const type = body.type;
       const createdAt = body.createdAt;
@@ -474,36 +536,13 @@ async function handleApi(req, res, url) {
       }
 
       if (body.action === "edit") {
-        const { createdAt, type, status, reason } = body;
-        if (!createdAt || !type || !status || !reason) {
-          return send(res, 400, { error: "Todos os campos (data, hora, tipo, status e justificativa) são obrigatórios." });
+        const result = applyAdminPunchEdit(punch, body, `${user.name} (${user.code})`);
+        if (!result.ok) {
+          return send(res, result.statusCode, { error: result.error });
         }
 
-        const validTypes = ["in", "interval_in", "interval_out", "out"];
-        if (!validTypes.includes(type)) {
-          return send(res, 400, { error: "Tipo de registro inválido." });
-        }
-
-        const hasChanges =
-          new Date(punch.createdAt).getTime() !== new Date(createdAt).getTime() ||
-          punch.type !== type ||
-          punch.status !== status ||
-          punch.reason !== reason;
-
-        if (hasChanges) {
-          if (!punch.originalCreatedAt) {
-            punch.originalCreatedAt = punch.createdAt;
-            punch.originalType = punch.type;
-            punch.originalStatus = punch.status;
-            punch.originalReason = punch.reason;
-          }
-          punch.createdAt = new Date(createdAt).toISOString();
-          punch.type = type;
-          punch.status = status;
-          punch.reason = reason;
-          punch.editedAt = nowIso();
-          punch.editedBy = `${user.name} (${user.code})`;
-        }
+        await writeJson(PUNCHES_FILE, punches);
+        return send(res, 200, { punch });
       } else {
         const status = body.status;
         const reason = body.reason || null;
