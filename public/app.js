@@ -7,6 +7,8 @@ const state = {
 };
 
 let intervalTimerId = null;
+let punchesAutoRefreshId = null;
+const PUNCHES_AUTO_REFRESH_MS = 15000;
 
 function requestNotificationPermission() {
   if ("Notification" in window && Notification.permission === "default") {
@@ -81,6 +83,7 @@ const elements = {
   btnCloseSelfProfile: document.querySelector("#btnCloseSelfProfile"),
   
   // Elementos da Aba de Espelho de Ponto
+  refreshPunchesBtn: document.querySelector("#refreshPunchesBtn"),
   btnOpenManualPunch: document.querySelector("#btnOpenManualPunch"),
   btnCloseManualPunch: document.querySelector("#btnCloseManualPunch"),
   manualPunchModal: document.querySelector("#manualPunchModal"),
@@ -161,8 +164,10 @@ function showApp() {
   elements.adminView.classList.toggle("hidden", !isAdm);
 
   if (isAdm) {
+    startPunchesAutoRefresh();
     switchTab(state.activeTab || "dashboard");
   } else {
+    stopPunchesAutoRefresh();
     elements.radiusBadge.textContent = `${state.config.allowedRadiusMeters}m`;
   }
   requestNotificationPermission();
@@ -187,11 +192,46 @@ function switchTab(tabId) {
   if (tabId === "dashboard") {
     renderAdminSummary();
   } else if (tabId === "punches") {
+    loadPunches().catch((error) => console.error(error));
     renderAdminPunchesTable();
   } else if (tabId === "users") {
     loadAdminUsers();
   } else if (tabId === "my-punch") {
     renderAdminPersonalPunch();
+  }
+}
+
+function shouldAutoRefreshPunches() {
+  return state.user?.role === "admin" && state.activeTab === "punches" && !elements.appView.classList.contains("hidden");
+}
+
+function startPunchesAutoRefresh() {
+  if (punchesAutoRefreshId) return;
+  punchesAutoRefreshId = setInterval(() => {
+    if (!shouldAutoRefreshPunches()) return;
+    loadPunches().catch((error) => console.error(error));
+  }, PUNCHES_AUTO_REFRESH_MS);
+}
+
+function stopPunchesAutoRefresh() {
+  if (!punchesAutoRefreshId) return;
+  clearInterval(punchesAutoRefreshId);
+  punchesAutoRefreshId = null;
+}
+
+async function refreshPunchesManually() {
+  if (!elements.refreshPunchesBtn) return;
+  const previousText = elements.refreshPunchesBtn.textContent;
+  elements.refreshPunchesBtn.disabled = true;
+  elements.refreshPunchesBtn.textContent = "Atualizando...";
+  try {
+    await loadPunches();
+  } catch (error) {
+    console.error(error);
+    alert("Nao foi possivel atualizar os pontos agora.");
+  } finally {
+    elements.refreshPunchesBtn.disabled = false;
+    elements.refreshPunchesBtn.textContent = previousText;
   }
 }
 
@@ -764,6 +804,7 @@ elements.loginForm.addEventListener("submit", async (event) => {
 
 elements.logoutButton.addEventListener("click", async () => {
   await api("/api/logout", { method: "POST" }).catch(() => {});
+  stopPunchesAutoRefresh();
   state.user = null;
   state.punches = [];
   showLogin();
@@ -1029,6 +1070,10 @@ if (elements.manualPunchForm) {
 
 if (elements.refreshDashboardBtn) {
   elements.refreshDashboardBtn.addEventListener("click", () => loadPunches());
+}
+
+if (elements.refreshPunchesBtn) {
+  elements.refreshPunchesBtn.addEventListener("click", () => refreshPunchesManually());
 }
 
 if (elements.newUserForm) {
