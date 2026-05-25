@@ -210,6 +210,7 @@ async function loadPunches() {
 function renderPunches() {
   if (!state.punches.length) {
     elements.punchList.innerHTML = '<p class="empty">Nenhum registro ainda.</p>';
+    updateButtonStates();
     return;
   }
 
