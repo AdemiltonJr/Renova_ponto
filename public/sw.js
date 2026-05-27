@@ -1,5 +1,5 @@
-const CACHE_NAME = "renova-ponto-v10";
-const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.json", "/icon.svg", "/logo.webp"];
+const CACHE_NAME = "renova-ponto-v11";
+const ASSETS = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.json", "/icon-192.png", "/icon-512.png", "/logo.webp"];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting(); // Força a atualização imediata do Service Worker
