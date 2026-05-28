@@ -57,10 +57,9 @@ O colaborador vê botões e histórico, mas ainda não tem uma leitura visual do
 Perfil é a categoria operacional da pessoa. Exemplos iniciais:
 
 - `Professor(a)`
-- `Professor(a) horista`
+- `Professor Horista`
 - `Auxiliar`
-- `Prof. Limpeza`
-- `Administrativo`
+- `Limpeza`
 
 O perfil ajuda o admin a organizar pessoas e escolher uma regra padrão, mas não deve ser a única fonte de cálculo. O ideal é separar perfil de regra de apuração.
 
@@ -82,7 +81,7 @@ Um colaborador pode ter um perfil e uma regra. Exemplo:
 
 Outro exemplo:
 
-- Perfil: `Professor(a) horista`
+- Perfil: `Professor Horista`
 - Regra: `horista`
 
 ### Jornada
@@ -168,6 +167,7 @@ O colaborador deve ver algo semelhante, mas apenas sobre si:
 - Próxima ação esperada.
 - Alertas simples, como "Você iniciou intervalo e ainda não finalizou".
 - Histórico recente com estados mais claros.
+- A mesma experiência de batida para todos os perfis, sem expor regras internas de cálculo ao colaborador.
 
 Exemplo:
 
@@ -194,6 +194,8 @@ Campos prováveis:
 
 O primeiro passo deve ser exportação CSV/Excel. Envio automático vem depois.
 
+Observação: a contabilidade usa o sistema Onvio. Nesta etapa, o objetivo não é integrar diretamente com o Onvio, mas estruturar o relatório em um formato limpo, consistente e fácil de usar em uma automação futura com Codex ou outra ferramenta.
+
 ## Regras Por Perfil
 
 ### Professor(a) Com Apuração Por Aula
@@ -214,9 +216,11 @@ Regra sugerida:
 - Se há marcação aprovada em dia sem aula prevista, marcar como "presença fora da grade".
 - Ajustes manuais podem autorizar presença/aula com justificativa.
 
-Questão aberta: uma única batida no dia basta para confirmar todas as aulas previstas ou precisa haver entrada e saída?
+Decisão inicial: uma marcação aprovada no dia confirma as aulas previstas daquele professor nessa data. Essa regra é intencionalmente simples para a primeira versão e poderá ser refinada depois.
 
-### Professor(a) Horista
+Importante: a forma de bater ponto permanece igual para todos os perfis. As diferenciações de perfil e apuração são internas, administrativas e usadas em relatórios. Isso preserva o valor legal e o efeito psicológico positivo da marcação de ponto pelo colaborador.
+
+### Professor Horista
 
 Regra provável:
 
@@ -227,7 +231,7 @@ Regra provável:
 
 Questão aberta: a apuração horista deve arredondar minutos? Se sim, qual regra?
 
-### Auxiliar, Prof. Limpeza e Administrativo
+### Auxiliar e Limpeza
 
 Regra inicial:
 
@@ -351,14 +355,18 @@ Entregas:
 - Registrar histórico de envio.
 - Permitir reenvio.
 
-## Decisões Pendentes
+## Decisões Fechadas Para A Primeira Versão
 
-- Quais perfis finais devem existir no primeiro cadastro?
-- Uma batida aprovada confirma todas as aulas do professor no dia?
-- Professores por aula precisam bater entrada e saída ou só presença?
+- Perfis da primeira versão: `Professor(a)`, `Professor Horista`, `Auxiliar` e `Limpeza`.
+- Para professor com apuração por aula, uma batida aprovada confirma inicialmente as aulas previstas do dia.
+- A forma de bater ponto permanece igual para todos os perfis; diferenciações ficam apenas na apuração administrativa.
+- O relatório contábil deve ser pensado primeiro como base otimizada para automação futura no Onvio, sem integração direta nesta fase.
+
+## Decisões Ainda Pendentes
+
 - Quais cargos têm carga horária fixa?
 - Haverá tolerância de atraso/saída antecipada?
-- O relatório contábil precisa sair em CSV simples, Excel, PDF ou formato específico?
+- O relatório para automação futura do Onvio deve sair em CSV simples, Excel ou outro formato tabular?
 - Quem aprova ajustes manuais antes do fechamento?
 - Depois de fechado o mês, registros podem ser editados?
 
@@ -381,4 +389,3 @@ Motivos:
 - A tela deixa claro qual foi a sequência de batidas de cada pessoa.
 - O espelho detalhado continua disponível para auditoria.
 - Nenhum dado de ponto existente precisa ser migrado para a primeira versão.
-
