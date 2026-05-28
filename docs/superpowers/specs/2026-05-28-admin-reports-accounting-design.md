@@ -97,18 +97,26 @@ Nem todo perfil precisa exigir todos os pontos, mas o sistema deve conseguir mos
 
 ### Inconsistência
 
-Inconsistência é qualquer situação que exige atenção:
+Inconsistência é qualquer situação operacional que exige atenção do admin dentro do fluxo normal de uso:
 
 - Sem entrada
 - Sem saída
 - Intervalo iniciado e não finalizado
-- Saída antes de entrada
-- Pontos duplicados do mesmo tipo em sequência
 - Ponto recusado por localização/precisão
 - Registro manual
 - Marcações fora da grade esperada
 - Aula prevista sem presença
 - Presença em dia sem aula prevista
+
+O app já bloqueia sequências inválidas pelo estado dos botões:
+
+- Antes da primeira entrada, apenas `Entrada` fica disponível.
+- Após `Entrada`, ficam disponíveis `Saída` e `Iniciar Intervalo`.
+- Após `Saída`, apenas uma nova `Entrada` fica disponível.
+- Após `Iniciar Intervalo`, apenas `Finalizar Intervalo` fica disponível.
+- Após `Finalizar Intervalo`, voltam a ficar disponíveis `Saída` e `Iniciar Intervalo`.
+
+Por isso, casos como saída antes de entrada ou pontos duplicados do mesmo tipo em sequência não devem ser tratados como inconsistências operacionais esperadas. Se aparecerem, devem ser considerados anomalias técnicas/auditoria, indicando bug, manipulação manual indevida ou dado legado.
 
 ## Visões Propostas
 
