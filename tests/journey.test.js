@@ -52,7 +52,40 @@ test("buildDailyJourneys groups approved punches into a complete journey", () =>
   assert.equal(result[0].lastIntervalIn.type, "interval_in");
   assert.equal(result[0].lastIntervalOut.type, "interval_out");
   assert.equal(result[0].lastOut.type, "out");
+  assert.deepEqual(result[0].journeySteps.map((step) => step.label), ["Entrada", "Intervalo", "Retorno", "Saída"]);
   assert.deepEqual(result[0].attention, []);
+});
+
+test("buildDailyJourneys keeps the default journey fields and appends extra punches only when they exist", () => {
+  const result = buildDailyJourneys([
+    punch({ type: "in", createdAt: "2026-05-28T11:00:00.000Z" }),
+    punch({ type: "interval_in", createdAt: "2026-05-28T15:00:00.000Z" }),
+    punch({ type: "interval_out", createdAt: "2026-05-28T15:15:00.000Z" }),
+    punch({ type: "interval_in", createdAt: "2026-05-28T17:00:00.000Z" }),
+    punch({ type: "interval_out", createdAt: "2026-05-28T17:15:00.000Z" }),
+    punch({ type: "out", createdAt: "2026-05-28T20:00:00.000Z" }),
+  ], { dateKey: "28/05/2026" });
+
+  assert.deepEqual(
+    result[0].journeySteps.map((step) => step.label),
+    ["Entrada", "Intervalo", "Retorno", "Saída", "Intervalo 2", "Retorno 2"],
+  );
+  assert.equal(result[0].journeySteps[1].punch.createdAt, "2026-05-28T15:00:00.000Z");
+  assert.equal(result[0].journeySteps[4].punch.createdAt, "2026-05-28T17:00:00.000Z");
+});
+
+test("buildDailyJourneys appends extra entries and exits only when a second work period exists", () => {
+  const result = buildDailyJourneys([
+    punch({ type: "in", createdAt: "2026-05-28T11:00:00.000Z" }),
+    punch({ type: "out", createdAt: "2026-05-28T15:00:00.000Z" }),
+    punch({ type: "in", createdAt: "2026-05-28T17:00:00.000Z" }),
+    punch({ type: "out", createdAt: "2026-05-28T20:00:00.000Z" }),
+  ], { dateKey: "28/05/2026" });
+
+  assert.deepEqual(
+    result[0].journeySteps.map((step) => step.label),
+    ["Entrada", "Intervalo", "Retorno", "Saída", "Entrada 2", "Saída 2"],
+  );
 });
 
 test("buildDailyJourneys marks open journey without exit", () => {

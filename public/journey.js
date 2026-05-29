@@ -28,6 +28,30 @@
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   }
 
+  function buildNumberedExtraSteps(label, punches) {
+    return punches.slice(1).map((punch, index) => ({
+      label: `${label} ${index + 2}`,
+      punch,
+    }));
+  }
+
+  function buildJourneySteps(ins, intervalIns, intervalOuts, outs) {
+    const baseSteps = [
+      { label: "Entrada", punch: ins[0] || null },
+      { label: "Intervalo", punch: intervalIns[0] || null },
+      { label: "Retorno", punch: intervalOuts[0] || null },
+      { label: "Saída", punch: outs[0] || null },
+    ];
+    const extraSteps = [
+      ...buildNumberedExtraSteps("Entrada", ins),
+      ...buildNumberedExtraSteps("Intervalo", intervalIns),
+      ...buildNumberedExtraSteps("Retorno", intervalOuts),
+      ...buildNumberedExtraSteps("Saída", outs),
+    ].sort((a, b) => byCreatedAtAsc(a.punch, b.punch));
+
+    return [...baseSteps, ...extraSteps];
+  }
+
   function matchesSearch(summary, search) {
     const term = String(search || "").trim().toLowerCase();
     if (!term) return true;
@@ -42,7 +66,8 @@
     const attention = [];
     const firstApproved = approved[0] || sorted[0] || {};
     const lastApproved = approved[approved.length - 1] || null;
-    const firstIn = approved.find((punch) => punch.type === "in") || null;
+    const ins = approved.filter((punch) => punch.type === "in");
+    const firstIn = ins[0] || null;
     const intervalIns = approved.filter((punch) => punch.type === "interval_in");
     const intervalOuts = approved.filter((punch) => punch.type === "interval_out");
     const outs = approved.filter((punch) => punch.type === "out");
@@ -80,6 +105,7 @@
       lastIntervalIn,
       lastIntervalOut,
       lastOut,
+      journeySteps: buildJourneySteps(ins, intervalIns, intervalOuts, outs),
       lastApprovedType: lastApproved?.type || null,
       status,
       statusLabel: STATUS_LABELS[status],

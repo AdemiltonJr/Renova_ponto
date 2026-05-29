@@ -620,12 +620,12 @@ function dateInputToDateKey(value) {
 }
 
 function renderJourneyCard(journey) {
-  const steps = [
+  const steps = journey.journeySteps || [
     ["Entrada", journey.firstIn],
     ["Intervalo", journey.lastIntervalIn],
     ["Retorno", journey.lastIntervalOut],
     ["Saída", journey.lastOut],
-  ];
+  ].map(([label, punch]) => ({ label, punch }));
   const attention = journey.attention.length
     ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
     : "";
@@ -640,10 +640,10 @@ function renderJourneyCard(journey) {
         <span class="journey-status ${journey.status}">${escapeHtml(journey.statusLabel)}</span>
       </div>
       <div class="journey-timeline">
-        ${steps.map(([label, punch]) => `
-          <div class="journey-step ${punch ? "done" : "pending"}">
-            <span>${label}</span>
-            <strong>${window.RenovaJourney.getPunchTime(punch)}</strong>
+        ${steps.map((step) => `
+          <div class="journey-step ${step.punch ? "done" : "pending"}">
+            <span>${escapeHtml(step.label)}</span>
+            <strong>${window.RenovaJourney.getPunchTime(step.punch)}</strong>
           </div>
         `).join("")}
       </div>
