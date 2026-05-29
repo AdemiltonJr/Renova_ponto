@@ -832,6 +832,10 @@ input:focus {
   background: linear-gradient(180deg, rgba(46, 91, 153, 0.04), rgba(255, 255, 255, 0.72));
 }
 
+.employee-journey-panel {
+  margin-top: 4px;
+}
+
 .journey-header {
   display: flex;
   align-items: flex-start;
@@ -870,6 +874,10 @@ input:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
+}
+
+.employee-journey-cards {
+  grid-template-columns: 1fr;
 }
 
 .journey-card {

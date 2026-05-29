@@ -61,6 +61,8 @@ const elements = {
   refreshButton: document.querySelector("#refreshButton"),
   appMessage: document.querySelector("#appMessage"),
   punchList: document.querySelector("#punchList"),
+  employeeJourneySummary: document.querySelector("#employeeJourneySummary"),
+  employeeJourneyCard: document.querySelector("#employeeJourneyCard"),
   
   // Elementos do Dashboard Administrativo
   adminTabs: document.querySelector("#adminTabs"),
@@ -256,6 +258,8 @@ async function loadPunches() {
 }
 
 function renderPunches() {
+  renderEmployeeJourneyView();
+
   if (!state.punches.length) {
     elements.punchList.innerHTML = '<p class="empty">Nenhum registro ainda.</p>';
     updateButtonStates();
@@ -613,6 +617,69 @@ function dateInputToDateKey(value) {
   if (!value) return new Date().toLocaleDateString("pt-BR");
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
+}
+
+function renderJourneyCard(journey) {
+  const steps = [
+    ["Entrada", journey.firstIn],
+    ["Intervalo", journey.lastIntervalIn],
+    ["Retorno", journey.lastIntervalOut],
+    ["Saída", journey.lastOut],
+  ];
+  const attention = journey.attention.length
+    ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
+    : "";
+
+  return `
+    <article class="journey-card ${journey.status}">
+      <div class="journey-card-top">
+        <div>
+          <strong>${escapeHtml(journey.userName)}</strong>
+          <small>Código: ${escapeHtml(journey.userCode)}</small>
+        </div>
+        <span class="journey-status ${journey.status}">${escapeHtml(journey.statusLabel)}</span>
+      </div>
+      <div class="journey-timeline">
+        ${steps.map(([label, punch]) => `
+          <div class="journey-step ${punch ? "done" : "pending"}">
+            <span>${label}</span>
+            <strong>${window.RenovaJourney.getPunchTime(punch)}</strong>
+          </div>
+        `).join("")}
+      </div>
+      ${attention}
+    </article>
+  `;
+}
+
+function renderEmployeeJourneyView() {
+  if (state.user?.role === "admin" || !elements.employeeJourneyCard || !window.RenovaJourney) return;
+
+  const dateKey = new Date().toLocaleDateString("pt-BR");
+  const journeys = window.RenovaJourney.buildDailyJourneys(state.punches, { dateKey });
+  const journey = journeys.find((item) => item.userId === state.user.id);
+
+  if (!journey) {
+    elements.employeeJourneySummary.textContent = "Nenhuma marcação registrada hoje.";
+    elements.employeeJourneyCard.innerHTML = renderJourneyCard({
+      userName: state.user.name,
+      userCode: state.user.code,
+      firstIn: null,
+      lastIntervalIn: null,
+      lastIntervalOut: null,
+      lastOut: null,
+      status: "not_started",
+      statusLabel: "Sem entrada",
+      attention: ["Aguardando primeira marcação"],
+    });
+    return;
+  }
+
+  const attentionText = journey.attention.length
+    ? `${journey.attention.length} ponto(s) de atenção`
+    : "sem alertas";
+  elements.employeeJourneySummary.textContent = `${journey.statusLabel} hoje · ${attentionText}`;
+  elements.employeeJourneyCard.innerHTML = renderJourneyCard(journey);
 }
 
 function renderAdminPunchesTable() {
