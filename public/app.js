@@ -94,6 +94,9 @@ const elements = {
   filterDate: document.querySelector("#filterDate"),
   filterType: document.querySelector("#filterType"),
   filterStatus: document.querySelector("#filterStatus"),
+  journeyDate: document.querySelector("#journeyDate"),
+  journeySummaryMeta: document.querySelector("#journeySummaryMeta"),
+  adminJourneyCards: document.querySelector("#adminJourneyCards"),
   adminPunchesTableBody: document.querySelector("#adminPunchesTableBody"),
   adminPunchesEmpty: document.querySelector("#adminPunchesEmpty"),
   editPunchModal: document.querySelector("#editPunchModal"),
@@ -192,7 +195,11 @@ function switchTab(tabId) {
   if (tabId === "dashboard") {
     renderAdminSummary();
   } else if (tabId === "punches") {
+    if (elements.journeyDate && !elements.journeyDate.value) {
+      elements.journeyDate.value = toDateInputValue();
+    }
     loadPunches().catch((error) => console.error(error));
+    renderAdminJourneyView();
     renderAdminPunchesTable();
   } else if (tabId === "users") {
     loadAdminUsers();
@@ -240,6 +247,7 @@ async function loadPunches() {
   state.punches = payload.punches || [];
   if (state.user?.role === "admin") {
     renderAdminSummary();
+    renderAdminJourneyView();
     renderAdminPunchesTable();
     renderAdminPersonalPunch();
   } else {
@@ -594,6 +602,19 @@ function matchesDateFilter(createdAtStr, filterValue) {
   return true; // "all"
 }
 
+function toDateInputValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputToDateKey(value) {
+  if (!value) return new Date().toLocaleDateString("pt-BR");
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
+}
+
 function renderAdminPunchesTable() {
   if (state.user?.role !== "admin") return;
   
@@ -692,6 +713,60 @@ function renderAdminPunchesTable() {
           </button>
         </td>
       </tr>
+    `;
+  }).join("");
+}
+
+function renderAdminJourneyView() {
+  if (state.user?.role !== "admin" || !elements.adminJourneyCards || !window.RenovaJourney) return;
+
+  if (!elements.journeyDate.value) {
+    elements.journeyDate.value = toDateInputValue();
+  }
+
+  const dateKey = dateInputToDateKey(elements.journeyDate.value);
+  const search = elements.filterSearch.value || "";
+  const journeys = window.RenovaJourney.buildDailyJourneys(state.punches, { dateKey, search });
+  const completeCount = journeys.filter((journey) => journey.status === "complete").length;
+  const attentionCount = journeys.filter((journey) => journey.attention.length > 0).length;
+
+  elements.journeySummaryMeta.textContent = `${journeys.length} colaboradores · ${completeCount} completas · ${attentionCount} com atenção`;
+
+  if (!journeys.length) {
+    elements.adminJourneyCards.innerHTML = '<p class="empty">Nenhuma jornada encontrada para a data e filtros selecionados.</p>';
+    return;
+  }
+
+  elements.adminJourneyCards.innerHTML = journeys.map((journey) => {
+    const steps = [
+      ["Entrada", journey.firstIn],
+      ["Intervalo", journey.lastIntervalIn],
+      ["Retorno", journey.lastIntervalOut],
+      ["Saída", journey.lastOut],
+    ];
+    const attention = journey.attention.length
+      ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
+      : "";
+
+    return `
+      <article class="journey-card ${journey.status}">
+        <div class="journey-card-top">
+          <div>
+            <strong>${escapeHtml(journey.userName)}</strong>
+            <small>Código: ${escapeHtml(journey.userCode)}</small>
+          </div>
+          <span class="journey-status ${journey.status}">${escapeHtml(journey.statusLabel)}</span>
+        </div>
+        <div class="journey-timeline">
+          ${steps.map(([label, punch]) => `
+            <div class="journey-step ${punch ? "done" : "pending"}">
+              <span>${label}</span>
+              <strong>${window.RenovaJourney.getPunchTime(punch)}</strong>
+            </div>
+          `).join("")}
+        </div>
+        ${attention}
+      </article>
     `;
   }).join("");
 }
@@ -841,10 +916,19 @@ document.querySelectorAll(".tab-button").forEach(btn => {
 
 // Filtros do Espelho de Ponto
 if (elements.filterSearch) {
-  elements.filterSearch.addEventListener("input", () => renderAdminPunchesTable());
-  elements.filterDate.addEventListener("change", () => renderAdminPunchesTable());
-  elements.filterType.addEventListener("change", () => renderAdminPunchesTable());
-  elements.filterStatus.addEventListener("change", () => renderAdminPunchesTable());
+  const renderAdminReports = () => {
+    renderAdminJourneyView();
+    renderAdminPunchesTable();
+  };
+
+  elements.filterSearch.addEventListener("input", renderAdminReports);
+  elements.filterDate.addEventListener("change", renderAdminReports);
+  elements.filterType.addEventListener("change", renderAdminReports);
+  elements.filterStatus.addEventListener("change", renderAdminReports);
+
+  if (elements.journeyDate) {
+    elements.journeyDate.addEventListener("change", renderAdminReports);
+  }
 }
 
 // Modal de Registro Manual
