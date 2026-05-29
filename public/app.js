@@ -804,38 +804,7 @@ function renderAdminJourneyView() {
     return;
   }
 
-  elements.adminJourneyCards.innerHTML = journeys.map((journey) => {
-    const steps = [
-      ["Entrada", journey.firstIn],
-      ["Intervalo", journey.lastIntervalIn],
-      ["Retorno", journey.lastIntervalOut],
-      ["Saída", journey.lastOut],
-    ];
-    const attention = journey.attention.length
-      ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
-      : "";
-
-    return `
-      <article class="journey-card ${journey.status}">
-        <div class="journey-card-top">
-          <div>
-            <strong>${escapeHtml(journey.userName)}</strong>
-            <small>Código: ${escapeHtml(journey.userCode)}</small>
-          </div>
-          <span class="journey-status ${journey.status}">${escapeHtml(journey.statusLabel)}</span>
-        </div>
-        <div class="journey-timeline">
-          ${steps.map(([label, punch]) => `
-            <div class="journey-step ${punch ? "done" : "pending"}">
-              <span>${label}</span>
-              <strong>${window.RenovaJourney.getPunchTime(punch)}</strong>
-            </div>
-          `).join("")}
-        </div>
-        ${attention}
-      </article>
-    `;
-  }).join("");
+  elements.adminJourneyCards.innerHTML = journeys.map(renderJourneyCard).join("");
 }
 
 function renderAdminPersonalPunch() {

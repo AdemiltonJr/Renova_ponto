@@ -872,7 +872,7 @@ input:focus {
 
 .journey-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 12px;
 }
 
@@ -913,11 +913,16 @@ input:focus {
   gap: 12px;
 }
 
+.journey-card-top > div {
+  min-width: 0;
+}
+
 .journey-card-top strong {
   display: block;
   color: var(--ink);
   font-size: 15px;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .journey-card-top small {
@@ -960,13 +965,14 @@ input:focus {
 
 .journey-timeline {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 8px;
 }
 
 .journey-step {
+  min-width: 0;
   min-height: 64px;
-  padding: 10px;
+  padding: 10px 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(46, 91, 153, 0.03);
@@ -986,14 +992,16 @@ input:focus {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .journey-step strong {
   display: block;
   margin-top: 6px;
   color: var(--brand-blue-dark);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 900;
+  line-height: 1.1;
 }
 
 .journey-attention {
