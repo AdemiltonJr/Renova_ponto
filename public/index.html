@@ -165,6 +165,23 @@
                 </div>
               </div>
 
+              <section class="journey-panel" aria-labelledby="journeyHeading">
+                <div class="journey-header">
+                  <div>
+                    <span class="eyebrow">Jornada diária</span>
+                    <h3 id="journeyHeading">Jornada diária</h3>
+                    <p id="journeySummaryMeta" class="journey-summary-meta">Selecione uma data para visualizar a jornada dos colaboradores.</p>
+                  </div>
+                  <label class="journey-date-field" for="journeyDate">
+                    Data
+                    <input id="journeyDate" type="date">
+                  </label>
+                </div>
+                <div id="adminJourneyCards" class="journey-cards" aria-live="polite"></div>
+              </section>
+
+              <h3 class="audit-table-heading">Eventos detalhados</h3>
+
               <div class="table-responsive">
                 <table class="punches-table">
                   <thead>
@@ -405,6 +422,7 @@
       </div>
     </div>
 
+    <script src="/journey.js" defer></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

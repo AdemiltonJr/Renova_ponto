@@ -821,6 +821,196 @@ input:focus {
   border-color: var(--brand-blue);
 }
 
+.journey-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border: 1px solid rgba(46, 91, 153, 0.1);
+  border-radius: var(--border-radius-sm);
+  background: linear-gradient(180deg, rgba(46, 91, 153, 0.04), rgba(255, 255, 255, 0.72));
+}
+
+.journey-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.journey-header h3 {
+  margin: 2px 0 6px;
+  color: var(--brand-blue-dark);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.journey-summary-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.journey-date-field {
+  flex: 0 0 190px;
+  color: var(--brand-blue-dark);
+}
+
+.journey-date-field input {
+  padding: 10px 12px;
+  border-width: 1px;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.journey-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.journey-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--border-radius-sm);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.journey-card.complete {
+  border-left: 5px solid var(--ok);
+}
+
+.journey-card.open,
+.journey-card.interval_open {
+  border-left: 5px solid var(--brand-yellow);
+}
+
+.journey-card.attention,
+.journey-card.not_started {
+  border-left: 5px solid var(--bad);
+}
+
+.journey-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.journey-card-top strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.journey-card-top small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.journey-status {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--brand-blue-dark);
+  background: rgba(46, 91, 153, 0.08);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.journey-status.complete {
+  color: white;
+  background: var(--ok);
+}
+
+.journey-status.open,
+.journey-status.interval_open {
+  background: var(--brand-yellow);
+}
+
+.journey-status.attention,
+.journey-status.not_started {
+  color: white;
+  background: var(--bad);
+}
+
+.journey-timeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.journey-step {
+  min-height: 64px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(46, 91, 153, 0.03);
+}
+
+.journey-step.done {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.journey-step.pending {
+  color: var(--muted);
+}
+
+.journey-step span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.journey-step strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--brand-blue-dark);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.journey-attention {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.journey-attention span {
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--bad);
+  background: rgba(239, 68, 68, 0.1);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.audit-table-heading {
+  margin: 0 0 12px;
+  color: var(--brand-blue-dark);
+  font-size: 16px;
+  font-weight: 800;
+}
+
 .table-responsive {
   width: 100%;
   overflow-x: auto;
@@ -987,6 +1177,16 @@ input:focus {
 }
 
 @media (max-width: 768px) {
+  .journey-header {
+    flex-direction: column;
+  }
+  .journey-date-field {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .journey-timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .punches-table, .punches-table thead, .punches-table tbody, .punches-table th, .punches-table td, .punches-table tr {
     display: block;
   }
