@@ -271,9 +271,9 @@ input:focus {
 }
 
 .header-logo {
-  width: 48px;
-  height: auto;
-  mix-blend-mode: multiply;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
 }
 
 .header-text {
