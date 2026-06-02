@@ -94,6 +94,10 @@
                 <h3 id="employeeJourneyHeading">Hoje</h3>
                 <p id="employeeJourneySummary" class="journey-summary-meta">Acompanhe suas marcações do dia.</p>
               </div>
+              <label class="journey-date-field" for="employeeJourneyDate">
+                Data
+                <input id="employeeJourneyDate" type="date">
+              </label>
             </div>
             <div id="employeeJourneyCard" class="journey-cards employee-journey-cards" aria-live="polite"></div>
           </section>
@@ -189,6 +193,23 @@
                   </label>
                 </div>
                 <div id="adminJourneyCards" class="journey-cards" aria-live="polite"></div>
+              </section>
+
+              <section class="journey-panel" aria-labelledby="journeyHistoryHeading">
+                <div class="journey-header">
+                  <div>
+                    <span class="eyebrow">Histórico por colaborador</span>
+                    <h3 id="journeyHistoryHeading">Últimas jornadas</h3>
+                    <p id="journeyHistoryMeta" class="journey-summary-meta">Selecione um colaborador para visualizar as últimas 5 jornadas registradas.</p>
+                  </div>
+                  <label class="journey-date-field journey-user-field" for="journeyUserSelect">
+                    Colaborador
+                    <select id="journeyUserSelect">
+                      <option value="">Selecione</option>
+                    </select>
+                  </label>
+                </div>
+                <div id="adminJourneyHistoryCards" class="journey-cards" aria-live="polite"></div>
               </section>
 
               <h3 class="audit-table-heading">Eventos detalhados</h3>

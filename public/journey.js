@@ -136,8 +136,34 @@
       .sort((a, b) => a.userName.localeCompare(b.userName, "pt-BR"));
   }
 
+  function byDateKeyDesc(a, b) {
+    const [aDay, aMonth, aYear] = a.split("/").map(Number);
+    const [bDay, bMonth, bYear] = b.split("/").map(Number);
+    return new Date(bYear, bMonth - 1, bDay).getTime() - new Date(aYear, aMonth - 1, aDay).getTime();
+  }
+
+  function buildUserJourneyHistory(punches, options = {}) {
+    const userId = options.userId;
+    if (!userId) return [];
+
+    const grouped = new Map();
+    for (const punch of punches || []) {
+      if (punch.userId !== userId) continue;
+      const dateKey = getDateKey(punch.createdAt);
+      if (!grouped.has(dateKey)) grouped.set(dateKey, []);
+      grouped.get(dateKey).push(punch);
+    }
+
+    const limit = Number(options.limit || 5);
+    return Array.from(grouped.entries())
+      .sort(([aDate], [bDate]) => byDateKeyDesc(aDate, bDate))
+      .slice(0, limit)
+      .map(([dateKey, userPunches]) => summarizeUserDay(userId, userPunches, dateKey));
+  }
+
   const api = {
     buildDailyJourneys,
+    buildUserJourneyHistory,
     getDateKey,
     getPunchTime,
     isManualPunch,

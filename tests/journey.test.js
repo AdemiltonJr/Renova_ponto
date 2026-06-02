@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   buildDailyJourneys,
+  buildUserJourneyHistory,
   getDateKey,
   getPunchTime,
   isManualPunch,
@@ -133,4 +134,26 @@ test("buildDailyJourneys filters by collaborator search", () => {
 
   assert.equal(result.length, 1);
   assert.equal(result[0].userName, "Talita");
+});
+
+test("buildUserJourneyHistory returns the latest five journeys for one collaborator", () => {
+  const result = buildUserJourneyHistory([
+    punch({ userId: "u1", type: "in", createdAt: "2026-05-23T11:00:00.000Z" }),
+    punch({ userId: "u1", type: "in", createdAt: "2026-05-24T11:00:00.000Z" }),
+    punch({ userId: "u1", type: "in", createdAt: "2026-05-25T11:00:00.000Z" }),
+    punch({ userId: "u1", type: "in", createdAt: "2026-05-26T11:00:00.000Z" }),
+    punch({ userId: "u1", type: "in", createdAt: "2026-05-27T11:00:00.000Z" }),
+    punch({ userId: "u1", type: "in", createdAt: "2026-05-28T11:00:00.000Z" }),
+    punch({ userId: "u2", userName: "Talita", type: "in", createdAt: "2026-05-29T11:00:00.000Z" }),
+  ], { userId: "u1", limit: 5 });
+
+  assert.equal(result.length, 5);
+  assert.deepEqual(result.map((journey) => journey.dateKey), [
+    "28/05/2026",
+    "27/05/2026",
+    "26/05/2026",
+    "25/05/2026",
+    "24/05/2026",
+  ]);
+  assert.equal(result.some((journey) => journey.userName === "Talita"), false);
 });

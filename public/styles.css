@@ -863,11 +863,17 @@ input:focus {
   color: var(--brand-blue-dark);
 }
 
-.journey-date-field input {
+.journey-date-field input,
+.journey-date-field select {
+  width: 100%;
   padding: 10px 12px;
   border-width: 1px;
   font-size: 14px;
   box-shadow: none;
+}
+
+.journey-user-field {
+  flex-basis: 260px;
 }
 
 .journey-cards {

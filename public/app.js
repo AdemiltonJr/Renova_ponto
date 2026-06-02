@@ -61,6 +61,8 @@ const elements = {
   refreshButton: document.querySelector("#refreshButton"),
   appMessage: document.querySelector("#appMessage"),
   punchList: document.querySelector("#punchList"),
+  employeeJourneyDate: document.querySelector("#employeeJourneyDate"),
+  employeeJourneyHeading: document.querySelector("#employeeJourneyHeading"),
   employeeJourneySummary: document.querySelector("#employeeJourneySummary"),
   employeeJourneyCard: document.querySelector("#employeeJourneyCard"),
   
@@ -99,6 +101,9 @@ const elements = {
   journeyDate: document.querySelector("#journeyDate"),
   journeySummaryMeta: document.querySelector("#journeySummaryMeta"),
   adminJourneyCards: document.querySelector("#adminJourneyCards"),
+  journeyUserSelect: document.querySelector("#journeyUserSelect"),
+  journeyHistoryMeta: document.querySelector("#journeyHistoryMeta"),
+  adminJourneyHistoryCards: document.querySelector("#adminJourneyHistoryCards"),
   adminPunchesTableBody: document.querySelector("#adminPunchesTableBody"),
   adminPunchesEmpty: document.querySelector("#adminPunchesEmpty"),
   editPunchModal: document.querySelector("#editPunchModal"),
@@ -202,6 +207,7 @@ function switchTab(tabId) {
     }
     loadPunches().catch((error) => console.error(error));
     renderAdminJourneyView();
+    renderAdminJourneyHistoryView();
     renderAdminPunchesTable();
   } else if (tabId === "users") {
     loadAdminUsers();
@@ -250,6 +256,7 @@ async function loadPunches() {
   if (state.user?.role === "admin") {
     renderAdminSummary();
     renderAdminJourneyView();
+    renderAdminJourneyHistoryView();
     renderAdminPunchesTable();
     renderAdminPersonalPunch();
   } else {
@@ -619,13 +626,16 @@ function dateInputToDateKey(value) {
   return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
 }
 
-function renderJourneyCard(journey) {
+function renderJourneyCard(journey, options = {}) {
   const steps = journey.journeySteps || [
     ["Entrada", journey.firstIn],
     ["Intervalo", journey.lastIntervalIn],
     ["Retorno", journey.lastIntervalOut],
     ["Saída", journey.lastOut],
   ].map(([label, punch]) => ({ label, punch }));
+  const detail = options.showDate
+    ? `${journey.dateKey} · Código: ${journey.userCode}`
+    : `Código: ${journey.userCode}`;
   const attention = journey.attention.length
     ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
     : "";
@@ -635,7 +645,7 @@ function renderJourneyCard(journey) {
       <div class="journey-card-top">
         <div>
           <strong>${escapeHtml(journey.userName)}</strong>
-          <small>Código: ${escapeHtml(journey.userCode)}</small>
+          <small>${escapeHtml(detail)}</small>
         </div>
         <span class="journey-status ${journey.status}">${escapeHtml(journey.statusLabel)}</span>
       </div>
@@ -655,15 +665,29 @@ function renderJourneyCard(journey) {
 function renderEmployeeJourneyView() {
   if (state.user?.role === "admin" || !elements.employeeJourneyCard || !window.RenovaJourney) return;
 
-  const dateKey = new Date().toLocaleDateString("pt-BR");
+  if (elements.employeeJourneyDate && !elements.employeeJourneyDate.value) {
+    elements.employeeJourneyDate.value = toDateInputValue();
+  }
+
+  const dateKey = elements.employeeJourneyDate?.value
+    ? dateInputToDateKey(elements.employeeJourneyDate.value)
+    : new Date().toLocaleDateString("pt-BR");
+  const todayKey = new Date().toLocaleDateString("pt-BR");
+  const isToday = dateKey === todayKey;
+  const dateLabel = isToday ? "hoje" : `em ${dateKey}`;
   const journeys = window.RenovaJourney.buildDailyJourneys(state.punches, { dateKey });
   const journey = journeys.find((item) => item.userId === state.user.id);
 
+  if (elements.employeeJourneyHeading) {
+    elements.employeeJourneyHeading.textContent = isToday ? "Hoje" : dateKey;
+  }
+
   if (!journey) {
-    elements.employeeJourneySummary.textContent = "Nenhuma marcação registrada hoje.";
+    elements.employeeJourneySummary.textContent = `Nenhuma marcação registrada ${dateLabel}.`;
     elements.employeeJourneyCard.innerHTML = renderJourneyCard({
       userName: state.user.name,
       userCode: state.user.code,
+      dateKey,
       firstIn: null,
       lastIntervalIn: null,
       lastIntervalOut: null,
@@ -678,8 +702,73 @@ function renderEmployeeJourneyView() {
   const attentionText = journey.attention.length
     ? `${journey.attention.length} ponto(s) de atenção`
     : "sem alertas";
-  elements.employeeJourneySummary.textContent = `${journey.statusLabel} hoje · ${attentionText}`;
+  elements.employeeJourneySummary.textContent = `${journey.statusLabel} ${dateLabel} · ${attentionText}`;
   elements.employeeJourneyCard.innerHTML = renderJourneyCard(journey);
+}
+
+function getJourneyUserOptions() {
+  const usersById = new Map();
+  for (const punch of state.punches) {
+    if (!punch.userId) continue;
+    usersById.set(punch.userId, {
+      id: punch.userId,
+      name: punch.userName || "Sem nome",
+      code: punch.userCode || "",
+    });
+  }
+  return Array.from(usersById.values())
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
+function populateJourneyUserSelect() {
+  if (!elements.journeyUserSelect) return;
+  const users = getJourneyUserOptions();
+  const currentValue = elements.journeyUserSelect.value;
+
+  if (!users.length) {
+    elements.journeyUserSelect.disabled = true;
+    elements.journeyUserSelect.innerHTML = '<option value="">Nenhum colaborador com jornada</option>';
+    return;
+  }
+
+  elements.journeyUserSelect.disabled = false;
+  elements.journeyUserSelect.innerHTML = [
+    '<option value="">Selecione</option>',
+    ...users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)} (${escapeHtml(user.code)})</option>`),
+  ].join("");
+
+  const hasCurrent = users.some((user) => user.id === currentValue);
+  elements.journeyUserSelect.value = hasCurrent ? currentValue : users[0].id;
+}
+
+function renderAdminJourneyHistoryView() {
+  if (state.user?.role !== "admin" || !elements.adminJourneyHistoryCards || !window.RenovaJourney) return;
+
+  populateJourneyUserSelect();
+  const userId = elements.journeyUserSelect?.value;
+
+  if (!userId) {
+    elements.journeyHistoryMeta.textContent = "Selecione um colaborador para visualizar as últimas 5 jornadas registradas.";
+    elements.adminJourneyHistoryCards.innerHTML = '<p class="empty">Nenhum colaborador selecionado.</p>';
+    return;
+  }
+
+  const history = window.RenovaJourney.buildUserJourneyHistory(state.punches, { userId, limit: 5 });
+  const selectedUser = getJourneyUserOptions().find((user) => user.id === userId);
+  const completeCount = history.filter((journey) => journey.status === "complete").length;
+  const attentionCount = history.filter((journey) => journey.attention.length > 0).length;
+  const selectedName = selectedUser?.name || "colaborador";
+
+  elements.journeyHistoryMeta.textContent = `${selectedName} · ${history.length} jornada(s) · ${completeCount} completas · ${attentionCount} com atenção`;
+
+  if (!history.length) {
+    elements.adminJourneyHistoryCards.innerHTML = '<p class="empty">Nenhuma jornada encontrada para este colaborador.</p>';
+    return;
+  }
+
+  elements.adminJourneyHistoryCards.innerHTML = history
+    .map((journey) => renderJourneyCard(journey, { showDate: true }))
+    .join("");
 }
 
 function renderAdminPunchesTable() {
@@ -934,6 +1023,9 @@ elements.intervalInButton.addEventListener("click", () => punch("interval_in"));
 elements.intervalOutButton.addEventListener("click", () => punch("interval_out"));
 elements.clockOutButton.addEventListener("click", () => punch("out"));
 elements.refreshButton.addEventListener("click", () => loadPunches());
+if (elements.employeeJourneyDate) {
+  elements.employeeJourneyDate.addEventListener("change", renderEmployeeJourneyView);
+}
 
 // Event Listeners dos botões de ponto pessoal do Admin
 elements.adminClockInButton.addEventListener("click", () => punch("in", true));
@@ -964,6 +1056,10 @@ if (elements.filterSearch) {
 
   if (elements.journeyDate) {
     elements.journeyDate.addEventListener("change", renderAdminReports);
+  }
+
+  if (elements.journeyUserSelect) {
+    elements.journeyUserSelect.addEventListener("change", renderAdminJourneyHistoryView);
   }
 }
 
