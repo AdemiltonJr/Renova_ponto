@@ -2,6 +2,7 @@ const state = {
   user: null,
   config: null,
   punches: [],
+  punchRequests: [],
   users: [],
   activeTab: "dashboard",
 };
@@ -61,6 +62,12 @@ const elements = {
   refreshButton: document.querySelector("#refreshButton"),
   appMessage: document.querySelector("#appMessage"),
   punchList: document.querySelector("#punchList"),
+  openAdjustmentRequestButton: document.querySelector("#openAdjustmentRequestButton"),
+  adjustmentRequestModal: document.querySelector("#adjustmentRequestModal"),
+  closeAdjustmentRequestButton: document.querySelector("#closeAdjustmentRequestButton"),
+  adjustmentRequestForm: document.querySelector("#adjustmentRequestForm"),
+  adjustmentRequestMessage: document.querySelector("#adjustmentRequestMessage"),
+  employeePunchRequestList: document.querySelector("#employeePunchRequestList"),
   employeeJourneyDate: document.querySelector("#employeeJourneyDate"),
   employeeJourneyHeading: document.querySelector("#employeeJourneyHeading"),
   employeeJourneySummary: document.querySelector("#employeeJourneySummary"),
@@ -94,6 +101,8 @@ const elements = {
   manualPunchForm: document.querySelector("#manualPunchForm"),
   manualPunchMessage: document.querySelector("#manualPunchMessage"),
   manualPunchUserSelect: document.querySelector("#manualPunchUserSelect"),
+  refreshRequestsButton: document.querySelector("#refreshRequestsButton"),
+  adminPunchRequestList: document.querySelector("#adminPunchRequestList"),
   filterSearch: document.querySelector("#filterSearch"),
   filterDate: document.querySelector("#filterDate"),
   filterType: document.querySelector("#filterType"),
@@ -151,6 +160,7 @@ async function boot() {
     state.config = payload.config;
     showApp();
     await loadPunches();
+    await loadPunchRequests();
     warmLocation();
   } catch {
     showLogin();
@@ -206,8 +216,10 @@ function switchTab(tabId) {
       elements.journeyDate.value = toDateInputValue();
     }
     loadPunches().catch((error) => console.error(error));
+    loadPunchRequests().catch((error) => console.error(error));
     renderAdminJourneyView();
     renderAdminJourneyHistoryView();
+    renderAdminPunchRequests();
     renderAdminPunchesTable();
   } else if (tabId === "users") {
     loadAdminUsers();
@@ -241,6 +253,7 @@ async function refreshPunchesManually() {
   elements.refreshPunchesBtn.textContent = "Atualizando...";
   try {
     await loadPunches();
+    await loadPunchRequests();
   } catch (error) {
     console.error(error);
     alert("Nao foi possivel atualizar os pontos agora.");
@@ -264,6 +277,106 @@ async function loadPunches() {
   }
 }
 
+async function loadPunchRequests() {
+  const payload = await api("/api/punch-requests");
+  state.punchRequests = payload.requests || [];
+  if (state.user?.role === "admin") {
+    renderAdminPunchRequests();
+  } else {
+    renderEmployeePunchRequests();
+  }
+}
+
+function getPunchTypeLabel(type, compact = false) {
+  const labels = compact
+    ? {
+        "in": "Entrada Trab.",
+        "interval_in": "Entrada Int.",
+        "interval_out": "Saída Int.",
+        "out": "Saída Trab.",
+      }
+    : {
+        "in": "Entrada Trabalho",
+        "interval_in": "Entrada Intervalo",
+        "interval_out": "Saída Intervalo",
+        "out": "Saída Trabalho",
+      };
+  return labels[type] || "Ponto";
+}
+
+function getPunchDetail(punch) {
+  if (punch.source === "employee_request") {
+    return "Ajuste solicitado pelo colaborador";
+  }
+  if (punch.status === "approved") {
+    return punch.distanceMeters !== null && punch.distanceMeters !== undefined
+      ? `${Math.round(punch.distanceMeters || 0)}m da escola`
+      : "Registro Manual";
+  }
+  return punch.reason || "Registro recusado";
+}
+
+function getRequestStatusLabel(status) {
+  if (status === "approved") return "Aprovado";
+  if (status === "rejected") return "Recusado";
+  return "Pendente";
+}
+
+function renderEmployeePunchRequests() {
+  if (!elements.employeePunchRequestList) return;
+  const requests = state.punchRequests.slice(0, 5);
+
+  if (!requests.length) {
+    elements.employeePunchRequestList.innerHTML = '<p class="empty">Nenhuma solicitação de ajuste.</p>';
+    return;
+  }
+
+  elements.employeePunchRequestList.innerHTML = requests.map((request) => {
+    const date = new Date(request.requestedCreatedAt);
+    const statusClass = request.status === "pending" ? "pending" : request.status === "approved" ? "approved" : "rejected";
+    const review = request.status === "pending"
+      ? "Aguardando aprovação"
+      : request.reviewReason || (request.status === "approved" ? "Aprovado pela administração" : "Recusado pela administração");
+    return `
+      <article class="request-item">
+        <div>
+          <strong>${getPunchTypeLabel(request.type)} - ${date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</strong>
+          <span>${escapeHtml(request.reason)}</span>
+          <small>${escapeHtml(review)}</small>
+        </div>
+        <span class="request-status ${statusClass}">${getRequestStatusLabel(request.status)}</span>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderAdminPunchRequests() {
+  if (!elements.adminPunchRequestList) return;
+  const pendingRequests = state.punchRequests.filter((request) => request.status === "pending");
+
+  if (!pendingRequests.length) {
+    elements.adminPunchRequestList.innerHTML = '<p class="empty">Nenhuma solicitação pendente.</p>';
+    return;
+  }
+
+  elements.adminPunchRequestList.innerHTML = pendingRequests.map((request) => {
+    const date = new Date(request.requestedCreatedAt);
+    return `
+      <article class="request-item admin-request-item">
+        <div>
+          <strong>${escapeHtml(request.userName)} - ${getPunchTypeLabel(request.type)}</strong>
+          <span>${date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} · ${escapeHtml(request.reason)}</span>
+          <small>Código: ${escapeHtml(request.userCode)} · Solicitado em ${new Date(request.requestedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</small>
+        </div>
+        <div class="request-actions">
+          <button class="btn-action-table approve" type="button" onclick="reviewPunchRequest('${request.id}', 'approve')">Aprovar</button>
+          <button class="btn-action-table delete" type="button" onclick="reviewPunchRequest('${request.id}', 'reject')">Recusar</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderPunches() {
   renderEmployeeJourneyView();
 
@@ -277,17 +390,9 @@ function renderPunches() {
     .slice(0, 20)
     .map((punch) => {
       const date = new Date(punch.createdAt);
-      const typeLabels = {
-        "in": "Entrada Trab.",
-        "interval_in": "Entrada Int.",
-        "interval_out": "Saída Int.",
-        "out": "Saída Trab."
-      };
-      const type = typeLabels[punch.type] || "Ponto";
+      const type = getPunchTypeLabel(punch.type, true);
       const status = punch.status === "approved" ? "Aprovado" : "Recusado";
-      const detail = punch.status === "approved"
-        ? `${Math.round(punch.distanceMeters || 0)}m da escola`
-        : punch.reason || "Registro recusado";
+      const detail = getPunchDetail(punch);
       return `
         <article class="punch-item">
           <div>
@@ -325,17 +430,9 @@ function renderAdminSummary() {
     .slice(0, 10)
     .map((punch) => {
       const date = new Date(punch.createdAt);
-      const typeLabels = {
-        "in": "Entrada Trab.",
-        "interval_in": "Entrada Int.",
-        "interval_out": "Saída Int.",
-        "out": "Saída Trab."
-      };
-      const type = typeLabels[punch.type] || "Ponto";
+      const type = getPunchTypeLabel(punch.type, true);
       const status = punch.status === "approved" ? "Aprovado" : "Recusado";
-      const detail = punch.status === "approved"
-        ? `${Math.round(punch.distanceMeters || 0)}m da escola`
-        : punch.reason || "Registro recusado";
+      const detail = getPunchDetail(punch);
       return `
         <article class="punch-item">
           <div>
@@ -798,30 +895,17 @@ function renderAdminPunchesTable() {
   
   elements.adminPunchesEmpty.classList.add("hidden");
   
-  const typeLabels = {
-    "in": "Entrada Trab.",
-    "interval_in": "Entrada Int.",
-    "interval_out": "Saída Int.",
-    "out": "Saída Trab."
-  };
-  
   elements.adminPunchesTableBody.innerHTML = filtered.map(punch => {
     const date = new Date(punch.createdAt);
-    const typeLabel = typeLabels[punch.type] || "Ponto";
+    const typeLabel = getPunchTypeLabel(punch.type, true);
     const statusLabel = punch.status === "approved" ? "Aprovado" : "Recusado";
     const statusClass = punch.status === "rejected" ? "rejected" : "";
-    
-    let details = "";
-    if (punch.status === "approved") {
-      details = punch.distanceMeters !== null ? `${punch.distanceMeters}m da escola` : "Registro Manual";
-    } else {
-      details = punch.reason || "Fora do raio/sem precisão";
-    }
+    const details = getPunchDetail(punch);
     
     let editedBadge = "";
     if (punch.originalCreatedAt) {
       const origDate = new Date(punch.originalCreatedAt);
-      const origTypeLabel = typeLabels[punch.originalType] || "Ponto";
+      const origTypeLabel = getPunchTypeLabel(punch.originalType, true);
       const origStatusLabel = punch.originalStatus === "approved" ? "Aprovado" : "Recusado";
       const origDetail = punch.originalReason || "";
       const tooltip = `Original:\nData/Hora: ${origDate.toLocaleString("pt-BR")}\nTipo: ${origTypeLabel}\nStatus: ${origStatusLabel}\nMotivo: ${origDetail}`;
@@ -909,17 +993,9 @@ function renderAdminPersonalPunch() {
       .slice(0, 20)
       .map((punch) => {
         const date = new Date(punch.createdAt);
-        const typeLabels = {
-          "in": "Entrada Trab.",
-          "interval_in": "Entrada Int.",
-          "interval_out": "Saída Int.",
-          "out": "Saída Trab."
-        };
-        const type = typeLabels[punch.type] || "Ponto";
+        const type = getPunchTypeLabel(punch.type, true);
         const status = punch.status === "approved" ? "Aprovado" : "Recusado";
-        const detail = punch.status === "approved"
-          ? `${Math.round(punch.distanceMeters || 0)}m da escola`
-          : punch.reason || "Registro recusado";
+        const detail = getPunchDetail(punch);
         return `
           <article class="punch-item">
             <div>
@@ -987,6 +1063,30 @@ window.deletePunch = async (punchId) => {
   }
 };
 
+window.reviewPunchRequest = async (requestId, action) => {
+  const isApproval = action === "approve";
+  const confirmation = isApproval
+    ? "Aprovar esta solicitação e criar o ponto ajustado?"
+    : "Recusar esta solicitação?";
+  if (!confirm(confirmation)) return;
+
+  const reviewReason = isApproval
+    ? ""
+    : prompt("Informe o motivo da recusa:", "Solicitação recusada pela administração");
+  if (!isApproval && reviewReason === null) return;
+
+  try {
+    await api("/api/admin/punch-requests", {
+      method: "PUT",
+      body: JSON.stringify({ requestId, action, reviewReason })
+    });
+    await loadPunchRequests();
+    await loadPunches();
+  } catch (error) {
+    alert("Erro: " + error.message);
+  }
+};
+
 elements.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setMessage(elements.loginMessage, "Entrando...");
@@ -1004,6 +1104,7 @@ elements.loginForm.addEventListener("submit", async (event) => {
     state.config = me.config;
     showApp();
     await loadPunches();
+    await loadPunchRequests();
     warmLocation();
   } catch (error) {
     setMessage(elements.loginMessage, error.message, "error");
@@ -1015,6 +1116,7 @@ elements.logoutButton.addEventListener("click", async () => {
   stopPunchesAutoRefresh();
   state.user = null;
   state.punches = [];
+  state.punchRequests = [];
   showLogin();
 });
 
@@ -1022,12 +1124,64 @@ elements.clockInButton.addEventListener("click", () => punch("in"));
 elements.intervalInButton.addEventListener("click", () => punch("interval_in"));
 elements.intervalOutButton.addEventListener("click", () => punch("interval_out"));
 elements.clockOutButton.addEventListener("click", () => punch("out"));
-elements.refreshButton.addEventListener("click", () => loadPunches());
+elements.refreshButton.addEventListener("click", async () => {
+  await loadPunches();
+  await loadPunchRequests();
+});
 if (elements.employeeJourneyDate) {
   elements.employeeJourneyDate.addEventListener("change", renderEmployeeJourneyView);
 }
 
 // Event Listeners dos botões de ponto pessoal do Admin
+if (elements.openAdjustmentRequestButton) {
+  elements.openAdjustmentRequestButton.addEventListener("click", () => {
+    const now = new Date();
+    const dateInput = elements.adjustmentRequestForm.querySelector('input[name="date"]');
+    const timeInput = elements.adjustmentRequestForm.querySelector('input[name="time"]');
+
+    elements.adjustmentRequestForm.reset();
+    dateInput.value = toDateInputValue(now);
+    timeInput.value = now.toTimeString().slice(0, 8);
+    elements.adjustmentRequestMessage.classList.add("hidden");
+    elements.adjustmentRequestModal.classList.remove("hidden");
+  });
+}
+
+if (elements.closeAdjustmentRequestButton) {
+  elements.closeAdjustmentRequestButton.addEventListener("click", () => {
+    elements.adjustmentRequestModal.classList.add("hidden");
+  });
+}
+
+if (elements.adjustmentRequestForm) {
+  elements.adjustmentRequestForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setMessage(elements.adjustmentRequestMessage, "Enviando solicitação...");
+    elements.adjustmentRequestMessage.classList.remove("hidden");
+
+    const form = new FormData(elements.adjustmentRequestForm);
+    const date = form.get("date");
+    const time = form.get("time");
+    const type = form.get("type");
+    const reason = form.get("reason");
+    const createdAt = new Date(`${date}T${time}`).toISOString();
+
+    try {
+      await api("/api/punch-requests", {
+        method: "POST",
+        body: JSON.stringify({ type, createdAt, reason })
+      });
+      setMessage(elements.adjustmentRequestMessage, "Solicitação enviada para aprovação.", "success");
+      await loadPunchRequests();
+      setTimeout(() => {
+        elements.adjustmentRequestModal.classList.add("hidden");
+      }, 1200);
+    } catch (error) {
+      setMessage(elements.adjustmentRequestMessage, error.message, "error");
+    }
+  });
+}
+
 elements.adminClockInButton.addEventListener("click", () => punch("in", true));
 elements.adminIntervalInButton.addEventListener("click", () => punch("interval_in", true));
 elements.adminIntervalOutButton.addEventListener("click", () => punch("interval_out", true));
@@ -1307,6 +1461,10 @@ if (elements.refreshDashboardBtn) {
 
 if (elements.refreshPunchesBtn) {
   elements.refreshPunchesBtn.addEventListener("click", () => refreshPunchesManually());
+}
+
+if (elements.refreshRequestsButton) {
+  elements.refreshRequestsButton.addEventListener("click", () => loadPunchRequests());
 }
 
 if (elements.newUserForm) {

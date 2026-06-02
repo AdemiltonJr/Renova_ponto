@@ -77,6 +77,7 @@
     const hasManual = sorted.some(isManualPunch);
     const hasEdited = sorted.some((punch) => Boolean(punch.originalCreatedAt));
     const hasRejected = rejected.length > 0;
+    const hasEmployeeRequest = sorted.some((punch) => punch.source === "employee_request");
 
     let status = "attention";
     if (!firstIn) {
@@ -94,6 +95,7 @@
 
     if (hasRejected) addUnique(attention, "Ponto recusado");
     if (hasManual) addUnique(attention, "Registro manual");
+    if (hasEmployeeRequest) addUnique(attention, "Ajuste solicitado pelo colaborador");
     if (hasEdited) addUnique(attention, "Registro editado");
 
     return {
@@ -112,6 +114,7 @@
       attention,
       hasRejected,
       hasManual,
+      hasEmployeeRequest,
       hasEdited,
       approvedCount: approved.length,
       rejectedCount: rejected.length,

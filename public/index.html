@@ -87,6 +87,14 @@
 
           <p id="appMessage" class="message" role="status"></p>
 
+          <section class="panel adjustment-panel">
+            <div class="section-heading">
+              <h2>Solicitações de ajuste</h2>
+              <button id="openAdjustmentRequestButton" class="text-button" type="button">Solicitar ajuste</button>
+            </div>
+            <div id="employeePunchRequestList" class="request-list" aria-live="polite"></div>
+          </section>
+
           <section class="journey-panel employee-journey-panel" aria-labelledby="employeeJourneyHeading">
             <div class="journey-header">
               <div>
@@ -179,6 +187,14 @@
                   </select>
                 </div>
               </div>
+
+              <section class="adjustment-panel admin-adjustment-panel">
+                <div class="section-heading">
+                  <h2>Solicitações pendentes</h2>
+                  <button id="refreshRequestsButton" class="text-button" type="button">Atualizar</button>
+                </div>
+                <div id="adminPunchRequestList" class="request-list" aria-live="polite"></div>
+              </section>
 
               <section class="journey-panel" aria-labelledby="journeyHeading">
                 <div class="journey-header">
@@ -300,6 +316,44 @@
         </div>
       </section>
     </main>
+
+    <!-- Modal de Solicitação de Ajuste pelo Colaborador -->
+    <div id="adjustmentRequestModal" class="modal hidden">
+      <div class="modal-content panel">
+        <div class="modal-header">
+          <h2>Solicitar ajuste de ponto</h2>
+          <button id="closeAdjustmentRequestButton" class="close-modal-btn" type="button">&times;</button>
+        </div>
+        <form id="adjustmentRequestForm">
+          <div class="form-row">
+            <label>
+              Data
+              <input type="date" name="date" required>
+            </label>
+            <label>
+              Hora
+              <input type="time" name="time" step="1" required>
+            </label>
+          </div>
+          <label>
+            Tipo de Registro
+            <select name="type" required>
+              <option value="in">Entrada Trabalho</option>
+              <option value="interval_in">Entrada Intervalo (Início)</option>
+              <option value="interval_out">Saída Intervalo (Fim)</option>
+              <option value="out">Saída Trabalho</option>
+            </select>
+          </label>
+          <label>
+            Justificativa
+            <input type="text" name="reason" placeholder="Ex: Esqueci de bater a saída, estava em reunião externa" required>
+          </label>
+          <p class="form-note">A solicitação ficará pendente até aprovação administrativa.</p>
+          <button class="primary-button" type="submit">Enviar solicitação</button>
+          <p id="adjustmentRequestMessage" class="message" role="status"></p>
+        </form>
+      </div>
+    </div>
 
     <!-- Modal de Registro de Ponto Manual -->
     <div id="manualPunchModal" class="modal hidden">

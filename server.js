@@ -9,6 +9,7 @@ const PUBLIC_DIR = path.join(ROOT, "public");
 const DATA_DIR = path.join(ROOT, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const PUNCHES_FILE = path.join(DATA_DIR, "punches.json");
+const PUNCH_REQUESTS_FILE = path.join(DATA_DIR, "punch-requests.json");
 const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
 
 const config = {
@@ -52,6 +53,7 @@ function redirect(res, location) {
 async function ensureData() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await createJsonIfMissing(PUNCHES_FILE, []);
+  await createJsonIfMissing(PUNCH_REQUESTS_FILE, []);
   await createJsonIfMissing(SESSIONS_FILE, []);
 
   try {
@@ -204,6 +206,59 @@ function validateLocation({ latitude, longitude, accuracy }) {
   return { ok: true, distance, accuracy: acc };
 }
 
+const validPunchTypes = ["in", "interval_in", "interval_out", "out"];
+
+function normalizePunchType(type) {
+  return validPunchTypes.includes(type) ? type : null;
+}
+
+function normalizeAdjustmentRequest(body) {
+  const type = normalizePunchType(body.type);
+  const reason = String(body.reason || "").trim();
+  const parsedDate = new Date(body.createdAt);
+
+  if (!type) {
+    return { ok: false, statusCode: 400, error: "Tipo de registro inválido." };
+  }
+
+  if (!Number.isFinite(parsedDate.getTime())) {
+    return { ok: false, statusCode: 400, error: "Data/hora inválida." };
+  }
+
+  if (parsedDate.getTime() > Date.now() + 5 * 60 * 1000) {
+    return { ok: false, statusCode: 400, error: "Não é possível solicitar ajuste para uma data futura." };
+  }
+
+  if (!reason || reason.length < 5) {
+    return { ok: false, statusCode: 400, error: "Informe uma justificativa com pelo menos 5 caracteres." };
+  }
+
+  return {
+    ok: true,
+    type,
+    reason,
+    requestedCreatedAt: parsedDate.toISOString(),
+  };
+}
+
+function publicPunchRequest(request) {
+  return {
+    id: request.id,
+    userId: request.userId,
+    userCode: request.userCode,
+    userName: request.userName,
+    type: request.type,
+    status: request.status,
+    reason: request.reason,
+    reviewReason: request.reviewReason || null,
+    requestedCreatedAt: request.requestedCreatedAt,
+    requestedAt: request.requestedAt,
+    reviewedAt: request.reviewedAt || null,
+    reviewedBy: request.reviewedBy || null,
+    punchId: request.punchId || null,
+  };
+}
+
 function applyAdminPunchEdit(punch, body, editor) {
   const { createdAt, type, status, reason } = body;
   if (!createdAt || !type || !status || !reason) {
@@ -331,8 +386,7 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === "/api/punches" && req.method === "POST") {
     const body = await readBody(req);
-    const validTypes = ["in", "interval_in", "interval_out", "out"];
-    const type = validTypes.includes(body.type) ? body.type : "in";
+    const type = normalizePunchType(body.type) || "in";
     const location = validateLocation(body.location || {});
     const punches = await readJson(PUNCHES_FILE, []);
     const punch = {
@@ -353,6 +407,39 @@ async function handleApi(req, res, url) {
     await writeJson(PUNCHES_FILE, punches);
     if (!location.ok) return send(res, 422, { error: location.reason, punch });
     return send(res, 201, { punch });
+  }
+
+  if (url.pathname === "/api/punch-requests") {
+    if (req.method === "GET") {
+      const requests = await readJson(PUNCH_REQUESTS_FILE, []);
+      const visible = user.role === "admin" ? requests : requests.filter((request) => request.userId === user.id);
+      return send(res, 200, { requests: visible.slice(-250).reverse().map(publicPunchRequest) });
+    }
+
+    if (req.method === "POST") {
+      const body = await readBody(req);
+      const normalized = normalizeAdjustmentRequest(body);
+      if (!normalized.ok) {
+        return send(res, normalized.statusCode, { error: normalized.error });
+      }
+
+      const requests = await readJson(PUNCH_REQUESTS_FILE, []);
+      const request = {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        userCode: user.code,
+        userName: user.name,
+        type: normalized.type,
+        status: "pending",
+        reason: normalized.reason,
+        requestedCreatedAt: normalized.requestedCreatedAt,
+        requestedAt: nowIso(),
+      };
+
+      requests.push(request);
+      await writeJson(PUNCH_REQUESTS_FILE, requests);
+      return send(res, 201, { request: publicPunchRequest(request) });
+    }
   }
 
   if (url.pathname === "/api/admin/users" && user.role === "admin") {
@@ -463,6 +550,68 @@ async function handleApi(req, res, url) {
       await writeJson(SESSIONS_FILE, sessions.filter((s) => s.userId !== targetId));
 
       return send(res, 200, { success: true });
+    }
+  }
+
+  if (url.pathname === "/api/admin/punch-requests" && user.role === "admin") {
+    if (req.method === "PUT") {
+      const body = await readBody(req);
+      const requestId = body.requestId;
+      const action = body.action;
+      const reviewReason = String(body.reviewReason || "").trim();
+
+      if (!requestId || !["approve", "reject"].includes(action)) {
+        return send(res, 400, { error: "Solicitação e ação são obrigatórias." });
+      }
+
+      const requests = await readJson(PUNCH_REQUESTS_FILE, []);
+      const request = requests.find((item) => item.id === requestId);
+      if (!request) {
+        return send(res, 404, { error: "Solicitação não encontrada." });
+      }
+
+      if (request.status !== "pending") {
+        return send(res, 400, { error: "Esta solicitação já foi revisada." });
+      }
+
+      request.reviewedAt = nowIso();
+      request.reviewedBy = `${user.name} (${user.code})`;
+      request.reviewReason = reviewReason || null;
+
+      if (action === "reject") {
+        request.status = "rejected";
+        await writeJson(PUNCH_REQUESTS_FILE, requests);
+        return send(res, 200, { request: publicPunchRequest(request) });
+      }
+
+      const punches = await readJson(PUNCHES_FILE, []);
+      const approvedPunch = {
+        id: crypto.randomUUID(),
+        userId: request.userId,
+        userCode: request.userCode,
+        userName: request.userName,
+        type: request.type,
+        status: "approved",
+        reason: request.reason,
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        distanceMeters: null,
+        createdAt: request.requestedCreatedAt,
+        source: "employee_request",
+        requestId: request.id,
+        requestedAt: request.requestedAt,
+        approvedAt: request.reviewedAt,
+        approvedBy: request.reviewedBy,
+      };
+
+      punches.push(approvedPunch);
+      request.status = "approved";
+      request.punchId = approvedPunch.id;
+
+      await writeJson(PUNCHES_FILE, punches);
+      await writeJson(PUNCH_REQUESTS_FILE, requests);
+      return send(res, 200, { request: publicPunchRequest(request), punch: approvedPunch });
     }
   }
 

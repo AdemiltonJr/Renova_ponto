@@ -21,6 +21,7 @@ function punch(overrides) {
     accuracy: overrides.accuracy ?? 15,
     createdAt: overrides.createdAt || "2026-05-28T10:00:00.000Z",
     originalCreatedAt: overrides.originalCreatedAt,
+    source: overrides.source,
   };
 }
 
@@ -116,13 +117,16 @@ test("buildDailyJourneys includes rejected, edited, and manual attention flags",
     punch({ type: "in", status: "rejected", reason: "Precisao insuficiente", createdAt: "2026-05-28T11:05:00.000Z" }),
     punch({ type: "out", status: "approved", reason: "Registro manual por admin", distanceMeters: 0, accuracy: 1, createdAt: "2026-05-28T20:00:00.000Z" }),
     punch({ type: "interval_in", status: "approved", originalCreatedAt: "2026-05-28T15:00:00.000Z", createdAt: "2026-05-28T15:10:00.000Z" }),
+    punch({ type: "interval_out", status: "approved", source: "employee_request", createdAt: "2026-05-28T15:30:00.000Z" }),
   ], { dateKey: "28/05/2026" });
 
   assert.equal(result[0].hasRejected, true);
   assert.equal(result[0].hasManual, true);
   assert.equal(result[0].hasEdited, true);
+  assert.equal(result[0].hasEmployeeRequest, true);
   assert.equal(result[0].attention.includes("Ponto recusado"), true);
   assert.equal(result[0].attention.includes("Registro manual"), true);
+  assert.equal(result[0].attention.includes("Ajuste solicitado pelo colaborador"), true);
   assert.equal(result[0].attention.includes("Registro editado"), true);
 });
 
