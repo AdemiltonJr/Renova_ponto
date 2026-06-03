@@ -223,20 +223,21 @@ function validateLocation({ latitude, longitude, accuracy }) {
 }
 
 const initialSchedulesByName = {
-  leonilda: { weekdays: [1, 2, 3, 4, 5], blocks: [["07:30", "12:00"], ["13:00", "17:30"]] },
-  viviane: { weekdays: [1, 2, 3, 4, 5], blocks: [["13:00", "17:30"]] },
-  priscila: { weekdays: [1, 2, 3, 4, 5], blocks: [["13:00", "17:30"]] },
-  gabrielle: { weekdays: [1, 2, 3, 4, 5], blocks: [["13:00", "18:00"]] },
-  mayara: { weekdays: [1, 2, 3, 4, 5], blocks: [["13:00", "18:00"]] },
-  jaqueline: { weekdays: [1, 2, 3, 4, 5], blocks: [["13:00", "18:00"]] },
-  talita: { weekdays: [1, 2, 3, 4, 5], blocks: [["13:00", "18:00"]] },
-  rosilaine: { weekdays: [1, 2, 3, 4, 5], blocks: [["07:30", "17:30"]] },
-  karen: { weekdays: [1, 2, 3, 4, 5], blocks: [["08:00", "18:00"]] },
-  bianca: { weekdays: [1, 2, 3, 4, 5], blocks: [["07:30", "17:30"]] },
-  rebeca: { weekdays: [1, 2, 3, 4, 5], blocks: [["13:00", "17:30"]] },
-  rosane: { days: { 3: [["13:45", "17:15"]], 4: [["14:30", "17:15"]] } },
-  gabriel: { days: { 1: [["13:45", "16:45"]], 2: [["13:00", "17:15"]], 4: [["13:00", "17:15"]], 5: [["13:45", "16:45"]] } },
-  leticia: { days: { 1: [["15:30", "17:15"]], 3: [["14:45", "17:15"]], 5: [["14:00", "17:15"]] } },
+  leonilda: { weekdays: [1, 2, 3, 4, 5], start: "07:30", end: "17:30", intervalMinutes: 60 },
+  viviane: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "17:30", intervalMinutes: 15 },
+  priscila: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "17:30", intervalMinutes: 15 },
+  gabrielle: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "18:00", intervalMinutes: 15 },
+  gabriele: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "18:00", intervalMinutes: 15 },
+  mayara: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "18:00", intervalMinutes: 15 },
+  jaqueline: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "18:00", intervalMinutes: 15 },
+  talita: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "18:00", intervalMinutes: 15 },
+  rosilaine: { weekdays: [1, 2, 3, 4, 5], start: "07:30", end: "17:30", intervalMinutes: 75 },
+  karen: { weekdays: [1, 2, 3, 4, 5], start: "08:00", end: "18:00", intervalMinutes: 75 },
+  bianca: { weekdays: [1, 2, 3, 4, 5], start: "07:30", end: "17:30", intervalMinutes: 75 },
+  rebeca: { weekdays: [1, 2, 3, 4, 5], start: "13:00", end: "17:30", intervalMinutes: 15 },
+  rosane: { days: { 3: { start: "13:45", end: "17:15", intervalMinutes: 0 }, 4: { start: "14:30", end: "17:15", intervalMinutes: 0 } } },
+  gabriel: { days: { 1: { start: "13:45", end: "16:45", intervalMinutes: 0 }, 2: { start: "13:00", end: "17:15", intervalMinutes: 0 }, 4: { start: "13:00", end: "17:15", intervalMinutes: 0 }, 5: { start: "13:45", end: "16:45", intervalMinutes: 0 } } },
+  leticia: { days: { 1: { start: "15:30", end: "17:15", intervalMinutes: 0 }, 3: { start: "14:45", end: "17:15", intervalMinutes: 0 }, 5: { start: "14:00", end: "17:15", intervalMinutes: 0 } } },
 };
 
 const vapidPublicKey = process.env.WEB_PUSH_PUBLIC_KEY || "";
@@ -259,7 +260,11 @@ function normalizeNameKey(name) {
 function buildDaysFromWeekdays(seed) {
   if (seed.days) return JSON.parse(JSON.stringify(seed.days));
   return seed.weekdays.reduce((days, weekday) => {
-    days[weekday] = JSON.parse(JSON.stringify(seed.blocks));
+    days[weekday] = {
+      start: Schedule.normalizeTime(seed.start),
+      end: Schedule.normalizeTime(seed.end),
+      intervalMinutes: Math.max(0, Math.round(Number(seed.intervalMinutes || 0))),
+    };
     return days;
   }, {});
 }
@@ -285,22 +290,17 @@ function normalizeScheduleDays(days) {
   if (!days || typeof days !== "object") return null;
   const normalized = {};
 
-  for (const [weekdayKey, blocks] of Object.entries(days)) {
+  for (const [weekdayKey, day] of Object.entries(days)) {
     const weekday = Number(weekdayKey);
-    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 || !Array.isArray(blocks)) return null;
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return null;
 
-    const normalizedBlocks = [];
-    for (const block of blocks) {
-      if (!Array.isArray(block) || block.length < 2) return null;
-      const start = Schedule.normalizeTime(block[0]);
-      const end = Schedule.normalizeTime(block[1]);
-      if (Schedule.parseTimeToMinutes(end) <= Schedule.parseTimeToMinutes(start)) return null;
-      normalizedBlocks.push([start, end]);
-    }
-
-    if (normalizedBlocks.length) {
-      normalized[weekday] = normalizedBlocks.sort((a, b) => Schedule.parseTimeToMinutes(a[0]) - Schedule.parseTimeToMinutes(b[0]));
-    }
+    const config = Schedule.normalizeDayConfig(day);
+    if (!config) return null;
+    normalized[weekday] = {
+      start: config.start,
+      end: config.end,
+      intervalMinutes: config.intervalMinutes,
+    };
   }
 
   return normalized;
@@ -308,14 +308,36 @@ function normalizeScheduleDays(days) {
 
 async function seedMissingSchedules() {
   const [users, schedules] = await Promise.all([readJson(USERS_FILE, []), readSchedules()]);
-  const existingUserIds = new Set(schedules.map((schedule) => schedule.userId));
-  const additions = users
-    .filter((item) => item.role === "employee" && !existingUserIds.has(item.id))
-    .map(buildInitialScheduleForUser)
-    .filter(Boolean);
+  let changed = false;
 
-  if (additions.length) {
-    await writeSchedules([...schedules, ...additions]);
+  for (const user of users.filter((item) => item.role === "employee")) {
+    const officialSchedule = buildInitialScheduleForUser(user);
+    if (!officialSchedule) continue;
+
+    const existingIndex = schedules.findIndex((schedule) => schedule.userId === user.id);
+    if (existingIndex === -1) {
+      schedules.push(officialSchedule);
+      changed = true;
+      continue;
+    }
+
+    const existing = schedules[existingIndex];
+    const expectedDays = normalizeScheduleDays(officialSchedule.days);
+    if (JSON.stringify(normalizeScheduleDays(existing.days)) !== JSON.stringify(expectedDays)) {
+      schedules[existingIndex] = {
+        ...existing,
+        profile: existing.profile || officialSchedule.profile,
+        notifyBeforeMinutes: existing.notifyBeforeMinutes || officialSchedule.notifyBeforeMinutes,
+        missedReminderMinutes: 5,
+        days: expectedDays,
+        updatedAt: nowIso(),
+      };
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await writeSchedules(schedules);
   }
 }
 
@@ -355,6 +377,16 @@ function hasPunchForEvent(punches, userId, dateKey, type) {
   });
 }
 
+function hasIntervalReturnAfter(punches, intervalInPunch) {
+  const intervalStart = new Date(intervalInPunch.createdAt).getTime();
+  return (punches || []).some((punch) => {
+    return punch.userId === intervalInPunch.userId &&
+      punch.status === "approved" &&
+      punch.type === "interval_out" &&
+      new Date(punch.createdAt).getTime() > intervalStart;
+  });
+}
+
 function getDueScheduleNotifications({ now = new Date(), schedules = [], punches = [], sentLog = [] }) {
   const dateKey = getZonedDateKey(now);
   const currentMinute = getZonedMinuteOfDay(now);
@@ -381,6 +413,48 @@ function getDueScheduleNotifications({ now = new Date(), schedules = [], punches
       }
     });
   });
+
+  const schedulesByUserId = new Map(schedules.map((schedule) => [schedule.userId, schedule]));
+  (punches || [])
+    .filter((punch) => punch.status === "approved" && punch.type === "interval_in")
+    .forEach((punch) => {
+      if (hasIntervalReturnAfter(punches, punch)) return;
+      const schedule = schedulesByUserId.get(punch.userId);
+      if (!schedule || schedule.active === false) return;
+
+      const intervalDateKey = getZonedDateKey(new Date(punch.createdAt));
+      const intervalMinutes = Schedule.getIntervalMinutesForDate(schedule, intervalDateKey);
+      if (!intervalMinutes) return;
+
+      const returnAt = new Date(new Date(punch.createdAt).getTime() + intervalMinutes * 60000);
+      const missedAt = new Date(returnAt.getTime() + Number(schedule.missedReminderMinutes || 5) * 60000);
+      const returnDateKey = getZonedDateKey(returnAt);
+      const returnMinute = getZonedMinuteOfDay(returnAt);
+      const missedDateKey = getZonedDateKey(missedAt);
+      const missedMinute = getZonedMinuteOfDay(missedAt);
+
+      if (dateKey === returnDateKey && currentMinute === returnMinute) {
+        const key = notificationKey(schedule.userId, intervalDateKey, `interval_out:${punch.id}`, "interval_return");
+        if (!sentKeys.has(key)) due.push({
+          key,
+          kind: "interval_return",
+          schedule,
+          event: { type: "interval_out", time: Schedule.minutesToTime(returnMinute), label: "Retorno" },
+          dateKey: intervalDateKey,
+        });
+      }
+
+      if (dateKey === missedDateKey && currentMinute === missedMinute) {
+        const key = notificationKey(schedule.userId, intervalDateKey, `interval_out:${punch.id}`, "interval_missed");
+        if (!sentKeys.has(key)) due.push({
+          key,
+          kind: "interval_missed",
+          schedule,
+          event: { type: "interval_out", time: Schedule.minutesToTime(returnMinute), label: "Retorno" },
+          dateKey: intervalDateKey,
+        });
+      }
+    });
 
   return due;
 }
@@ -421,9 +495,14 @@ async function runScheduleNotificationTick(now = new Date()) {
   const delivered = [];
   for (const item of due) {
     const label = item.event.label.toLowerCase();
-    const body = item.kind === "upcoming"
+    let body = item.kind === "upcoming"
       ? `Seu ponto de ${label} esta chegando: ${item.event.time}.`
       : `Voce ainda nao registrou ${label} das ${item.event.time}.`;
+    if (item.kind === "interval_return") {
+      body = `Seu intervalo acabou. Registre o retorno ao trabalho.`;
+    } else if (item.kind === "interval_missed") {
+      body = `Seu retorno do intervalo ainda nao foi registrado.`;
+    }
     const result = await sendPushToUser(item.schedule.userId, {
       title: "Renova Ponto",
       body,

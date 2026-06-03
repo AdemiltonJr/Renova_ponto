@@ -354,6 +354,17 @@ async function loadSchedules() {
   renderScheduleAdminList();
 }
 
+function getScheduleForUser(userId) {
+  return (state.schedules || []).find((schedule) => schedule.userId === userId) || null;
+}
+
+function getIntervalMinutesForPunch(punch) {
+  if (!window.RenovaSchedule || !punch) return 0;
+  const schedule = getScheduleForUser(punch.userId);
+  if (!schedule) return 0;
+  return window.RenovaSchedule.getIntervalMinutesForDate(schedule, punch.createdAt);
+}
+
 function getPunchTypeLabel(type, compact = false) {
   const labels = compact
     ? {
@@ -707,14 +718,15 @@ async function punch(type, isAdminPersonal = false) {
     setMessage(msgElement, "Ponto registrado com sucesso.", "success");
 
     if (type === "interval_in") {
-      if ("Notification" in window && Notification.permission === "granted") {
+      const intervalMinutes = getIntervalMinutesForPunch(payload.punch);
+      if (intervalMinutes && "Notification" in window && Notification.permission === "granted") {
         if (intervalTimerId) clearTimeout(intervalTimerId);
         intervalTimerId = setTimeout(() => {
           new Notification("Escola Renova Ponto", {
-            body: "Seu intervalo de 15 minutos acabou!",
+            body: "Seu intervalo acabou. Registre o retorno ao trabalho.",
             icon: "/logo.webp"
           });
-        }, 15 * 60 * 1000);
+        }, intervalMinutes * 60 * 1000);
       }
     } else if (type === "interval_out" || type === "out") {
       if (intervalTimerId) {
@@ -806,14 +818,44 @@ function getNextExpectedEvent(journey) {
   }) || null;
 }
 
-function renderJourneyHours(journey) {
-  if (!window.RenovaSchedule || !journey.expectedMinutes) return "";
+function renderExpectedPunchLine(label, expectedTime, punch) {
+  const actual = punch ? window.RenovaJourney.getPunchTime(punch) : "Pendente";
+  const stateClass = punch ? "done" : "pending";
+  return `
+    <div class="expected-punch-line ${stateClass}">
+      <span>${label}</span>
+      <strong>Esperado ${expectedTime}</strong>
+      <small>${actual}</small>
+    </div>
+  `;
+}
+
+function renderExpectedSchedule(journey) {
+  if (!window.RenovaSchedule || !journey.schedule) return "";
+  const dayConfig = window.RenovaSchedule.getDayConfigForDate(journey.schedule, journey.isoDateKey || dateKeyToDateInputValue(journey.dateKey));
+  if (!dayConfig) return "";
+
+  const intervalMinutes = dayConfig.intervalMinutes || 0;
+  let intervalDetail = "Sem intervalo previsto";
+  if (intervalMinutes) {
+    intervalDetail = `Duração esperada: ${window.RenovaSchedule.formatIntervalDuration(intervalMinutes)}`;
+    if (journey.lastIntervalIn && !journey.lastIntervalOut) {
+      const startedAt = window.RenovaJourney.getPunchTime(journey.lastIntervalIn);
+      const returnAt = window.RenovaSchedule.getReturnTimeFromIntervalStart(journey.schedule, journey.isoDateKey, startedAt);
+      if (returnAt) intervalDetail = `Retorno esperado: ${returnAt}`;
+    } else if (journey.lastIntervalOut) {
+      intervalDetail = `Retorno marcado: ${window.RenovaJourney.getPunchTime(journey.lastIntervalOut)}`;
+    }
+  }
 
   return `
-    <div class="journey-hours">
-      <span>Previsto <strong>${window.RenovaSchedule.formatMinutesAsDuration(journey.expectedMinutes)}</strong></span>
-      <span>Realizado <strong>${window.RenovaSchedule.formatMinutesAsDuration(journey.workedMinutes)}</strong></span>
-      <span>Saldo <strong>${window.RenovaSchedule.formatMinutesAsDuration(journey.balanceMinutes)}</strong></span>
+    <div class="expected-schedule">
+      <div class="expected-schedule-title">Horários esperados</div>
+      <div class="expected-punch-grid">
+        ${renderExpectedPunchLine("Entrada", dayConfig.start, journey.firstIn)}
+        ${renderExpectedPunchLine("Saída", dayConfig.end, journey.lastOut)}
+      </div>
+      <div class="expected-interval-note">${intervalDetail}</div>
     </div>
   `;
 }
@@ -831,7 +873,7 @@ function renderJourneyCard(journey, options = {}) {
   const attention = journey.attention.length
     ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
     : "";
-  const hours = renderJourneyHours(journey);
+  const expectedSchedule = renderExpectedSchedule(journey);
 
   return `
     <article class="journey-card ${journey.status}">
@@ -850,7 +892,7 @@ function renderJourneyCard(journey, options = {}) {
           </div>
         `).join("")}
       </div>
-      ${hours}
+      ${expectedSchedule}
       ${attention}
     </article>
   `;

@@ -187,6 +187,7 @@
       lastIntervalOut,
       lastOut,
       journeySteps: buildJourneySteps(ins, intervalIns, intervalOuts, outs),
+      schedule,
       expectedEvents,
       expectedMinutes,
       workedMinutes,

@@ -149,16 +149,16 @@ test("buildDailyJourneys adds expected schedule and hour balance", () => {
   ], {
     dateKey: "01/06/2026",
     schedules: [{
-      userId: "u1",
-      active: true,
-      days: { 1: [["07:30", "12:00"], ["13:00", "17:30"]] },
-    }],
+    userId: "u1",
+    active: true,
+    days: { 1: { start: "07:30", end: "17:30", intervalMinutes: 60 } },
+  }],
   });
 
   assert.equal(result[0].expectedMinutes, 540);
   assert.equal(result[0].workedMinutes, 540);
   assert.equal(result[0].balanceMinutes, 0);
-  assert.equal(result[0].expectedEvents.length, 4);
+  assert.equal(result[0].expectedEvents.length, 2);
 });
 
 test("buildDailyJourneys includes scheduled collaborators without punches", () => {
@@ -167,15 +167,15 @@ test("buildDailyJourneys includes scheduled collaborators without punches", () =
     now: new Date("2026-06-02T12:00:00.000Z"),
     users: [{ id: "u1", name: "Viviane", code: "viviane" }],
     schedules: [{
-      userId: "u1",
-      active: true,
-      days: { 1: [["13:00", "17:30"]] },
-    }],
+    userId: "u1",
+    active: true,
+    days: { 1: { start: "13:00", end: "17:30", intervalMinutes: 15 } },
+  }],
   });
 
   assert.equal(result.length, 1);
   assert.equal(result[0].userName, "Viviane");
-  assert.equal(result[0].expectedMinutes, 270);
+  assert.equal(result[0].expectedMinutes, 255);
   assert.equal(result[0].attention.includes("Entrada esperada sem marcacao"), true);
   assert.equal(result[0].attention.includes("Saida esperada sem marcacao"), true);
 });

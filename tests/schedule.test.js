@@ -5,7 +5,9 @@ const {
   calculateExpectedMinutesForDate,
   formatMinutesAsDuration,
   formatScheduleDays,
+  getDayConfigForDate,
   getExpectedEventsForDate,
+  getReturnTimeFromIntervalStart,
   normalizeTime,
   parseTimeToMinutes,
   toIsoDateKey,
@@ -37,11 +39,11 @@ test("formatMinutesAsDuration formats signed hour balance", () => {
   assert.equal(formatMinutesAsDuration(0), "0h00");
 });
 
-test("getExpectedEventsForDate builds four events for two work blocks", () => {
+test("getExpectedEventsForDate builds fixed entry and exit events for interval schedules", () => {
   const schedule = {
     userId: "u1",
     active: true,
-    days: { 1: [["07:30", "12:00"], ["13:00", "17:30"]] },
+    days: { 1: { start: "07:30", end: "17:30", intervalMinutes: 60 } },
   };
 
   assert.deepEqual(
@@ -51,8 +53,6 @@ test("getExpectedEventsForDate builds four events for two work blocks", () => {
     })),
     [
       { type: "in", time: "07:30" },
-      { type: "interval_in", time: "12:00" },
-      { type: "interval_out", time: "13:00" },
       { type: "out", time: "17:30" },
     ],
   );
@@ -75,22 +75,43 @@ test("calculateExpectedMinutesForDate sums all work blocks", () => {
   const schedule = {
     userId: "u1",
     active: true,
-    days: { 1: [["07:30", "12:00"], ["13:00", "17:30"]] },
+    days: { 1: { start: "07:30", end: "17:30", intervalMinutes: 60 } },
   };
 
   assert.equal(calculateExpectedMinutesForDate(schedule, "2026-06-01"), 540);
+});
+
+test("getReturnTimeFromIntervalStart calculates dynamic interval return", () => {
+  const schedule = {
+    userId: "u1",
+    active: true,
+    days: { 1: { start: "13:00", end: "18:00", intervalMinutes: 15 } },
+  };
+
+  assert.equal(getReturnTimeFromIntervalStart(schedule, "2026-06-01", "15:10"), "15:25");
 });
 
 test("formatScheduleDays renders a compact weekly summary", () => {
   const schedule = {
     active: true,
     days: {
-      1: [["13:45", "16:45"]],
-      5: [["13:45", "16:45"]],
+      1: { start: "13:45", end: "16:45", intervalMinutes: 0 },
+      5: { start: "13:45", end: "16:45", intervalMinutes: 0 },
     },
   };
 
   assert.equal(formatScheduleDays(schedule), "Seg: 13:45-16:45 | Sex: 13:45-16:45");
+});
+
+test("formatScheduleDays includes interval duration when configured", () => {
+  const schedule = {
+    active: true,
+    days: {
+      1: { start: "13:00", end: "18:00", intervalMinutes: 15 },
+    },
+  };
+
+  assert.equal(formatScheduleDays(schedule), "Seg: 13:00-18:00, intervalo 15 min");
 });
 
 test("normalizeNameKey removes accents and uses the first name", () => {
@@ -101,28 +122,42 @@ test("buildInitialScheduleForUser maps Leonilda to two blocks Monday through Fri
   const schedule = buildInitialScheduleForUser({ id: "u1", name: "Leonilda", role: "employee" });
 
   assert.equal(schedule.userId, "u1");
-  assert.deepEqual(schedule.days[1], [["07:30", "12:00"], ["13:00", "17:30"]]);
-  assert.deepEqual(schedule.days[5], [["07:30", "12:00"], ["13:00", "17:30"]]);
+  assert.deepEqual(schedule.days[1], { start: "07:30", end: "17:30", intervalMinutes: 60 });
+  assert.deepEqual(schedule.days[5], { start: "07:30", end: "17:30", intervalMinutes: 60 });
 });
 
 test("buildInitialScheduleForUser maps Gabriel only on configured weekdays", () => {
   const schedule = buildInitialScheduleForUser({ id: "u2", name: "Gabriel", role: "employee" });
 
   assert.deepEqual(Object.keys(schedule.days).sort(), ["1", "2", "4", "5"]);
-  assert.deepEqual(schedule.days[1], [["13:45", "16:45"]]);
+  assert.deepEqual(schedule.days[1], { start: "13:45", end: "16:45", intervalMinutes: 0 });
   assert.equal(schedule.days[3], undefined);
 });
 
 test("buildInitialScheduleForUser maps accented Leticia name", () => {
   const schedule = buildInitialScheduleForUser({ id: "u3", name: "Letícia", role: "employee" });
 
-  assert.deepEqual(schedule.days[1], [["15:30", "17:15"]]);
-  assert.deepEqual(schedule.days[3], [["14:45", "17:15"]]);
+  assert.deepEqual(schedule.days[1], { start: "15:30", end: "17:15", intervalMinutes: 0 });
+  assert.deepEqual(schedule.days[3], { start: "14:45", end: "17:15", intervalMinutes: 0 });
 });
 
 test("normalizeScheduleDays pads times and rejects inverted blocks", () => {
-  assert.deepEqual(normalizeScheduleDays({ 1: [["8:00", "18:00"]] }), { 1: [["08:00", "18:00"]] });
-  assert.equal(normalizeScheduleDays({ 1: [["18:00", "08:00"]] }), null);
+  assert.deepEqual(normalizeScheduleDays({ 1: { start: "8:00", end: "18:00", intervalMinutes: 15 } }), { 1: { start: "08:00", end: "18:00", intervalMinutes: 15 } });
+  assert.equal(normalizeScheduleDays({ 1: { start: "18:00", end: "08:00" } }), null);
+});
+
+test("legacy block schedules are interpreted as one shift with interval duration", () => {
+  const schedule = {
+    active: true,
+    days: { 1: [["07:30", "12:00"], ["13:00", "17:30"]] },
+  };
+
+  assert.deepEqual(getDayConfigForDate(schedule, "2026-06-01"), {
+    start: "07:30",
+    end: "17:30",
+    intervalMinutes: 60,
+    blocks: [["07:30", "12:00"], ["13:00", "17:30"]],
+  });
 });
 
 test("getDueScheduleNotifications sends upcoming reminder before expected punch", () => {
@@ -168,4 +203,43 @@ test("getDueScheduleNotifications does not repeat sent reminders or remind after
 
   assert.equal(dueWithLog.length, 0);
   assert.equal(dueWithPunch.length, 0);
+});
+
+test("getDueScheduleNotifications sends dynamic interval return reminder", () => {
+  const due = getDueScheduleNotifications({
+    now: new Date("2026-06-01T15:25:00-03:00"),
+    schedules: [{ userId: "u1", active: true, notifyBeforeMinutes: 10, missedReminderMinutes: 5, days: { 1: { start: "13:00", end: "18:00", intervalMinutes: 15 } } }],
+    punches: [{ id: "p1", userId: "u1", type: "interval_in", status: "approved", createdAt: "2026-06-01T18:10:00.000Z" }],
+    sentLog: [],
+  });
+
+  assert.equal(due.length, 1);
+  assert.equal(due[0].kind, "interval_return");
+  assert.equal(due[0].event.type, "interval_out");
+});
+
+test("getDueScheduleNotifications sends one dynamic interval missed reminder", () => {
+  const due = getDueScheduleNotifications({
+    now: new Date("2026-06-01T15:30:00-03:00"),
+    schedules: [{ userId: "u1", active: true, notifyBeforeMinutes: 10, missedReminderMinutes: 5, days: { 1: { start: "13:00", end: "18:00", intervalMinutes: 15 } } }],
+    punches: [{ id: "p1", userId: "u1", type: "interval_in", status: "approved", createdAt: "2026-06-01T18:10:00.000Z" }],
+    sentLog: [],
+  });
+
+  assert.equal(due.length, 1);
+  assert.equal(due[0].kind, "interval_missed");
+});
+
+test("getDueScheduleNotifications skips dynamic interval when return exists", () => {
+  const due = getDueScheduleNotifications({
+    now: new Date("2026-06-01T15:25:00-03:00"),
+    schedules: [{ userId: "u1", active: true, notifyBeforeMinutes: 10, missedReminderMinutes: 5, days: { 1: { start: "13:00", end: "18:00", intervalMinutes: 15 } } }],
+    punches: [
+      { id: "p1", userId: "u1", type: "interval_in", status: "approved", createdAt: "2026-06-01T18:10:00.000Z" },
+      { id: "p2", userId: "u1", type: "interval_out", status: "approved", createdAt: "2026-06-01T18:20:00.000Z" },
+    ],
+    sentLog: [],
+  });
+
+  assert.equal(due.length, 0);
 });
