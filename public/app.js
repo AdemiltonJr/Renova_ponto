@@ -818,46 +818,32 @@ function getNextExpectedEvent(journey) {
   }) || null;
 }
 
-function renderExpectedPunchLine(label, expectedTime, punch) {
-  const actual = punch ? window.RenovaJourney.getPunchTime(punch) : "Pendente";
-  const stateClass = punch ? "done" : "pending";
-  return `
-    <div class="expected-punch-line ${stateClass}">
-      <span>${label}</span>
-      <strong>Esperado ${expectedTime}</strong>
-      <small>${actual}</small>
-    </div>
-  `;
+function getJourneyDayConfig(journey) {
+  if (!window.RenovaSchedule || !journey.schedule) return "";
+  return window.RenovaSchedule.getDayConfigForDate(journey.schedule, journey.isoDateKey || dateKeyToDateInputValue(journey.dateKey));
 }
 
-function renderExpectedSchedule(journey) {
-  if (!window.RenovaSchedule || !journey.schedule) return "";
-  const dayConfig = window.RenovaSchedule.getDayConfigForDate(journey.schedule, journey.isoDateKey || dateKeyToDateInputValue(journey.dateKey));
-  if (!dayConfig) return "";
+function getExpectedStepText(step, journey, dayConfig) {
+  if (!dayConfig || !window.RenovaSchedule) return "";
+  const label = String(step.label || "");
 
-  const intervalMinutes = dayConfig.intervalMinutes || 0;
-  let intervalDetail = "Sem intervalo previsto";
-  if (intervalMinutes) {
-    intervalDetail = `Duração esperada: ${window.RenovaSchedule.formatIntervalDuration(intervalMinutes)}`;
-    if (journey.lastIntervalIn && !journey.lastIntervalOut) {
-      const startedAt = window.RenovaJourney.getPunchTime(journey.lastIntervalIn);
-      const returnAt = window.RenovaSchedule.getReturnTimeFromIntervalStart(journey.schedule, journey.isoDateKey, startedAt);
-      if (returnAt) intervalDetail = `Retorno esperado: ${returnAt}`;
-    } else if (journey.lastIntervalOut) {
-      intervalDetail = `Retorno marcado: ${window.RenovaJourney.getPunchTime(journey.lastIntervalOut)}`;
-    }
+  if (label === "Entrada") return `Esperado ${dayConfig.start}`;
+  if (label === "Saída") return `Esperado ${dayConfig.end}`;
+
+  const intervalMinutes = Number(dayConfig.intervalMinutes || 0);
+  if (!intervalMinutes) return "";
+
+  if (label === "Intervalo") {
+    return `${window.RenovaSchedule.formatIntervalDuration(intervalMinutes)} esperados`;
   }
 
-  return `
-    <div class="expected-schedule">
-      <div class="expected-schedule-title">Horários esperados</div>
-      <div class="expected-punch-grid">
-        ${renderExpectedPunchLine("Entrada", dayConfig.start, journey.firstIn)}
-        ${renderExpectedPunchLine("Saída", dayConfig.end, journey.lastOut)}
-      </div>
-      <div class="expected-interval-note">${intervalDetail}</div>
-    </div>
-  `;
+  if (label === "Retorno" && journey.lastIntervalIn && !journey.lastIntervalOut) {
+    const startedAt = window.RenovaJourney.getPunchTime(journey.lastIntervalIn);
+    const returnAt = window.RenovaSchedule.getReturnTimeFromIntervalStart(journey.schedule, journey.isoDateKey, startedAt);
+    return returnAt ? `Esperado ${returnAt}` : "";
+  }
+
+  return "";
 }
 
 function renderJourneyCard(journey, options = {}) {
@@ -873,7 +859,7 @@ function renderJourneyCard(journey, options = {}) {
   const attention = journey.attention.length
     ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
     : "";
-  const expectedSchedule = renderExpectedSchedule(journey);
+  const dayConfig = getJourneyDayConfig(journey);
 
   return `
     <article class="journey-card ${journey.status}">
@@ -885,14 +871,17 @@ function renderJourneyCard(journey, options = {}) {
         <span class="journey-status ${journey.status}">${escapeHtml(journey.statusLabel)}</span>
       </div>
       <div class="journey-timeline">
-        ${steps.map((step) => `
-          <div class="journey-step ${step.punch ? "done" : "pending"}">
-            <span>${escapeHtml(step.label)}</span>
-            <strong>${window.RenovaJourney.getPunchTime(step.punch)}</strong>
-          </div>
-        `).join("")}
+        ${steps.map((step) => {
+          const expectedText = getExpectedStepText(step, journey, dayConfig);
+          return `
+            <div class="journey-step ${step.punch ? "done" : "pending"}">
+              <span>${escapeHtml(step.label)}</span>
+              <strong>${window.RenovaJourney.getPunchTime(step.punch)}</strong>
+              ${expectedText ? `<small>${escapeHtml(expectedText)}</small>` : ""}
+            </div>
+          `;
+        }).join("")}
       </div>
-      ${expectedSchedule}
       ${attention}
     </article>
   `;
