@@ -3,6 +3,7 @@ const state = {
   config: null,
   punches: [],
   punchRequests: [],
+  schedules: [],
   users: [],
   activeTab: "dashboard",
 };
@@ -72,6 +73,8 @@ const elements = {
   employeeJourneyHeading: document.querySelector("#employeeJourneyHeading"),
   employeeJourneySummary: document.querySelector("#employeeJourneySummary"),
   employeeJourneyCard: document.querySelector("#employeeJourneyCard"),
+  activateNotificationsButton: document.querySelector("#activateNotificationsButton"),
+  notificationStatus: document.querySelector("#notificationStatus"),
   
   // Elementos do Dashboard Administrativo
   adminTabs: document.querySelector("#adminTabs"),
@@ -113,6 +116,7 @@ const elements = {
   journeyUserSelect: document.querySelector("#journeyUserSelect"),
   journeyHistoryMeta: document.querySelector("#journeyHistoryMeta"),
   adminJourneyHistoryCards: document.querySelector("#adminJourneyHistoryCards"),
+  scheduleAdminList: document.querySelector("#scheduleAdminList"),
   adminPunchesTableBody: document.querySelector("#adminPunchesTableBody"),
   adminPunchesEmpty: document.querySelector("#adminPunchesEmpty"),
   editPunchModal: document.querySelector("#editPunchModal"),
@@ -153,12 +157,49 @@ async function api(path, options = {}) {
   return payload;
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+async function activatePushNotifications() {
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    throw new Error("Este navegador nao suporta notificacoes push.");
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    throw new Error("Permissao de notificacao nao concedida.");
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  const { publicKey } = await api("/api/push/public-key");
+  const existing = await registration.pushManager.getSubscription();
+  const subscription = existing || await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
+
+  await api("/api/push/subscriptions", {
+    method: "POST",
+    body: JSON.stringify({ subscription }),
+  });
+
+  return subscription;
+}
+
 async function boot() {
   try {
     const payload = await api("/api/me");
     state.user = payload.user;
     state.config = payload.config;
     showApp();
+    await loadSchedules();
+    if (state.user.role === "admin") {
+      await loadAdminUsers();
+    }
     await loadPunches();
     await loadPunchRequests();
     warmLocation();
@@ -190,7 +231,18 @@ function showApp() {
     stopPunchesAutoRefresh();
     elements.radiusBadge.textContent = `${state.config.allowedRadiusMeters}m`;
   }
-  requestNotificationPermission();
+  updateNotificationStatus();
+}
+
+function updateNotificationStatus() {
+  if (!elements.notificationStatus || !("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    elements.notificationStatus.textContent = "Notificacoes permitidas neste aparelho.";
+  } else if (Notification.permission === "denied") {
+    elements.notificationStatus.textContent = "Notificacoes bloqueadas nas configuracoes do navegador.";
+  } else {
+    elements.notificationStatus.textContent = "Ative para receber alertas no celular.";
+  }
 }
 
 function switchTab(tabId) {
@@ -221,6 +273,7 @@ function switchTab(tabId) {
     renderAdminJourneyHistoryView();
     renderAdminPunchRequests();
     renderAdminPunchesTable();
+    renderScheduleAdminList();
   } else if (tabId === "users") {
     loadAdminUsers();
   } else if (tabId === "my-punch") {
@@ -252,6 +305,7 @@ async function refreshPunchesManually() {
   elements.refreshPunchesBtn.disabled = true;
   elements.refreshPunchesBtn.textContent = "Atualizando...";
   try {
+    await loadSchedules();
     await loadPunches();
     await loadPunchRequests();
   } catch (error) {
@@ -285,6 +339,19 @@ async function loadPunchRequests() {
   } else {
     renderEmployeePunchRequests();
   }
+}
+
+async function loadSchedules() {
+  if (!state.user) return;
+
+  if (state.user.role === "admin") {
+    const payload = await api("/api/admin/schedules");
+    state.schedules = payload.schedules || [];
+  } else {
+    const payload = await api("/api/my-schedule");
+    state.schedules = payload.schedule ? [payload.schedule] : [];
+  }
+  renderScheduleAdminList();
 }
 
 function getPunchTypeLabel(type, compact = false) {
@@ -453,6 +520,7 @@ async function loadAdminUsers(options = {}) {
     state.users = payload.users || [];
     renderAdminUsers(state.users);
     populateUserSelect();
+    renderScheduleAdminList();
   } catch (error) {
     console.error(error);
     if (options.throwOnError) throw error;
@@ -723,6 +791,33 @@ function dateInputToDateKey(value) {
   return new Date(year, month - 1, day).toLocaleDateString("pt-BR");
 }
 
+function dateKeyToDateInputValue(dateKey) {
+  const match = String(dateKey || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return toDateInputValue();
+  return `${match[3]}-${match[2]}-${match[1]}`;
+}
+
+function getNextExpectedEvent(journey) {
+  const journeyDate = journey.isoDateKey || dateKeyToDateInputValue(journey.dateKey);
+  if (journeyDate !== toDateInputValue()) return null;
+  const now = new Date();
+  return (journey.expectedEvents || []).find((event) => {
+    return new Date(`${journeyDate}T${event.time}:00`).getTime() >= now.getTime();
+  }) || null;
+}
+
+function renderJourneyHours(journey) {
+  if (!window.RenovaSchedule || !journey.expectedMinutes) return "";
+
+  return `
+    <div class="journey-hours">
+      <span>Previsto <strong>${window.RenovaSchedule.formatMinutesAsDuration(journey.expectedMinutes)}</strong></span>
+      <span>Realizado <strong>${window.RenovaSchedule.formatMinutesAsDuration(journey.workedMinutes)}</strong></span>
+      <span>Saldo <strong>${window.RenovaSchedule.formatMinutesAsDuration(journey.balanceMinutes)}</strong></span>
+    </div>
+  `;
+}
+
 function renderJourneyCard(journey, options = {}) {
   const steps = journey.journeySteps || [
     ["Entrada", journey.firstIn],
@@ -736,6 +831,7 @@ function renderJourneyCard(journey, options = {}) {
   const attention = journey.attention.length
     ? `<div class="journey-attention">${journey.attention.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>`
     : "";
+  const hours = renderJourneyHours(journey);
 
   return `
     <article class="journey-card ${journey.status}">
@@ -754,6 +850,7 @@ function renderJourneyCard(journey, options = {}) {
           </div>
         `).join("")}
       </div>
+      ${hours}
       ${attention}
     </article>
   `;
@@ -772,7 +869,11 @@ function renderEmployeeJourneyView() {
   const todayKey = new Date().toLocaleDateString("pt-BR");
   const isToday = dateKey === todayKey;
   const dateLabel = isToday ? "hoje" : `em ${dateKey}`;
-  const journeys = window.RenovaJourney.buildDailyJourneys(state.punches, { dateKey });
+  const journeys = window.RenovaJourney.buildDailyJourneys(state.punches, {
+    dateKey,
+    schedules: state.schedules,
+    users: [state.user],
+  });
   const journey = journeys.find((item) => item.userId === state.user.id);
 
   if (elements.employeeJourneyHeading) {
@@ -792,6 +893,10 @@ function renderEmployeeJourneyView() {
       status: "not_started",
       statusLabel: "Sem entrada",
       attention: ["Aguardando primeira marcação"],
+      expectedEvents: [],
+      expectedMinutes: 0,
+      workedMinutes: 0,
+      balanceMinutes: 0,
     });
     return;
   }
@@ -799,12 +904,23 @@ function renderEmployeeJourneyView() {
   const attentionText = journey.attention.length
     ? `${journey.attention.length} ponto(s) de atenção`
     : "sem alertas";
-  elements.employeeJourneySummary.textContent = `${journey.statusLabel} ${dateLabel} · ${attentionText}`;
+  const nextEvent = getNextExpectedEvent(journey);
+  const nextText = nextEvent ? ` · Próximo ponto: ${nextEvent.label} ${nextEvent.time}` : "";
+  elements.employeeJourneySummary.textContent = `${journey.statusLabel} ${dateLabel} · ${attentionText}${nextText}`;
   elements.employeeJourneyCard.innerHTML = renderJourneyCard(journey);
 }
 
 function getJourneyUserOptions() {
   const usersById = new Map();
+  for (const user of state.users || []) {
+    if (user.role === "employee" && user.active !== false) {
+      usersById.set(user.id, {
+        id: user.id,
+        name: user.name || "Sem nome",
+        code: user.code || "",
+      });
+    }
+  }
   for (const punch of state.punches) {
     if (!punch.userId) continue;
     usersById.set(punch.userId, {
@@ -850,7 +966,12 @@ function renderAdminJourneyHistoryView() {
     return;
   }
 
-  const history = window.RenovaJourney.buildUserJourneyHistory(state.punches, { userId, limit: 5 });
+  const history = window.RenovaJourney.buildUserJourneyHistory(state.punches, {
+    userId,
+    limit: 5,
+    schedules: state.schedules,
+    users: state.users,
+  });
   const selectedUser = getJourneyUserOptions().find((user) => user.id === userId);
   const completeCount = history.filter((journey) => journey.status === "complete").length;
   const attentionCount = history.filter((journey) => journey.attention.length > 0).length;
@@ -865,6 +986,38 @@ function renderAdminJourneyHistoryView() {
 
   elements.adminJourneyHistoryCards.innerHTML = history
     .map((journey) => renderJourneyCard(journey, { showDate: true }))
+    .join("");
+}
+
+function renderScheduleAdminList() {
+  if (state.user?.role !== "admin" || !elements.scheduleAdminList || !window.RenovaSchedule) return;
+  const usersById = new Map((state.users || []).map((user) => [user.id, user]));
+
+  if (!state.schedules.length) {
+    elements.scheduleAdminList.innerHTML = '<p class="empty">Nenhuma grade de horarios cadastrada.</p>';
+    return;
+  }
+
+  elements.scheduleAdminList.innerHTML = state.schedules
+    .slice()
+    .sort((a, b) => {
+      const userA = usersById.get(a.userId);
+      const userB = usersById.get(b.userId);
+      return String(userA?.name || "").localeCompare(String(userB?.name || ""), "pt-BR");
+    })
+    .map((schedule) => {
+      const user = usersById.get(schedule.userId);
+      const status = schedule.active === false ? "Inativa" : "Ativa";
+      return `
+        <article class="schedule-row ${schedule.active === false ? "inactive" : ""}">
+          <div>
+            <strong>${escapeHtml(user?.name || "Colaborador")}</strong>
+            <span>${escapeHtml(schedule.profile || "Colaborador")} · ${status} · Aviso ${Number(schedule.notifyBeforeMinutes || 10)} min antes</span>
+          </div>
+          <p>${escapeHtml(window.RenovaSchedule.formatScheduleDays(schedule))}</p>
+        </article>
+      `;
+    })
     .join("");
 }
 
@@ -966,7 +1119,12 @@ function renderAdminJourneyView() {
 
   const dateKey = dateInputToDateKey(elements.journeyDate.value);
   const search = elements.filterSearch.value || "";
-  const journeys = window.RenovaJourney.buildDailyJourneys(state.punches, { dateKey, search });
+  const journeys = window.RenovaJourney.buildDailyJourneys(state.punches, {
+    dateKey,
+    search,
+    schedules: state.schedules,
+    users: state.users,
+  });
   const completeCount = journeys.filter((journey) => journey.status === "complete").length;
   const attentionCount = journeys.filter((journey) => journey.attention.length > 0).length;
 
@@ -1087,6 +1245,27 @@ window.reviewPunchRequest = async (requestId, action) => {
   }
 };
 
+async function handleActivateNotifications() {
+  if (!elements.activateNotificationsButton || !elements.notificationStatus) return;
+
+  const previousText = elements.activateNotificationsButton.textContent;
+  elements.activateNotificationsButton.disabled = true;
+  elements.activateNotificationsButton.textContent = "Ativando...";
+  elements.notificationStatus.textContent = "Solicitando permissao do celular...";
+
+  try {
+    await activatePushNotifications();
+    elements.notificationStatus.textContent = "Notificacoes ativas neste aparelho.";
+  } catch (error) {
+    elements.notificationStatus.textContent = error.message || "Nao foi possivel ativar notificacoes.";
+  } finally {
+    elements.activateNotificationsButton.disabled = false;
+    elements.activateNotificationsButton.textContent = previousText;
+  }
+}
+
+elements.activateNotificationsButton?.addEventListener("click", handleActivateNotifications);
+
 elements.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setMessage(elements.loginMessage, "Entrando...");
@@ -1103,6 +1282,10 @@ elements.loginForm.addEventListener("submit", async (event) => {
     const me = await api("/api/me");
     state.config = me.config;
     showApp();
+    await loadSchedules();
+    if (state.user.role === "admin") {
+      await loadAdminUsers();
+    }
     await loadPunches();
     await loadPunchRequests();
     warmLocation();

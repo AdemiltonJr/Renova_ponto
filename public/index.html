@@ -110,6 +110,15 @@
             <div id="employeeJourneyCard" class="journey-cards employee-journey-cards" aria-live="polite"></div>
           </section>
 
+          <section class="notification-panel" aria-labelledby="notificationHeading">
+            <div>
+              <span class="eyebrow">Notificacoes</span>
+              <h3 id="notificationHeading">Lembretes do ponto</h3>
+              <p id="notificationStatus">Ative para receber alertas no celular.</p>
+            </div>
+            <button id="activateNotificationsButton" class="text-button" type="button">Ativar notificacoes</button>
+          </section>
+
           <section class="panel">
             <div class="section-heading">
               <h2>Ultimos registros</h2>
@@ -226,6 +235,17 @@
                   </label>
                 </div>
                 <div id="adminJourneyHistoryCards" class="journey-cards" aria-live="polite"></div>
+              </section>
+
+              <section class="schedule-admin-panel" aria-labelledby="scheduleAdminHeading">
+                <div class="journey-header">
+                  <div>
+                    <span class="eyebrow">Grade</span>
+                    <h3 id="scheduleAdminHeading">Horarios dos colaboradores</h3>
+                    <p class="journey-summary-meta">Base usada para lembretes, saldo de horas e relatÃ³rios futuros.</p>
+                  </div>
+                </div>
+                <div id="scheduleAdminList" class="schedule-admin-list" aria-live="polite"></div>
               </section>
 
               <h3 class="audit-table-heading">Eventos detalhados</h3>
@@ -508,6 +528,7 @@
       </div>
     </div>
 
+    <script src="/schedule.js" defer></script>
     <script src="/journey.js" defer></script>
     <script src="/app.js" defer></script>
   </body>

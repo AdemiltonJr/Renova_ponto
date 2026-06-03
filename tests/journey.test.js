@@ -140,6 +140,46 @@ test("buildDailyJourneys filters by collaborator search", () => {
   assert.equal(result[0].userName, "Talita");
 });
 
+test("buildDailyJourneys adds expected schedule and hour balance", () => {
+  const result = buildDailyJourneys([
+    punch({ userId: "u1", userName: "Leonilda", userCode: "leo", type: "in", createdAt: "2026-06-01T10:30:00.000Z" }),
+    punch({ userId: "u1", userName: "Leonilda", userCode: "leo", type: "interval_in", createdAt: "2026-06-01T15:00:00.000Z" }),
+    punch({ userId: "u1", userName: "Leonilda", userCode: "leo", type: "interval_out", createdAt: "2026-06-01T16:00:00.000Z" }),
+    punch({ userId: "u1", userName: "Leonilda", userCode: "leo", type: "out", createdAt: "2026-06-01T20:30:00.000Z" }),
+  ], {
+    dateKey: "01/06/2026",
+    schedules: [{
+      userId: "u1",
+      active: true,
+      days: { 1: [["07:30", "12:00"], ["13:00", "17:30"]] },
+    }],
+  });
+
+  assert.equal(result[0].expectedMinutes, 540);
+  assert.equal(result[0].workedMinutes, 540);
+  assert.equal(result[0].balanceMinutes, 0);
+  assert.equal(result[0].expectedEvents.length, 4);
+});
+
+test("buildDailyJourneys includes scheduled collaborators without punches", () => {
+  const result = buildDailyJourneys([], {
+    dateKey: "01/06/2026",
+    now: new Date("2026-06-02T12:00:00.000Z"),
+    users: [{ id: "u1", name: "Viviane", code: "viviane" }],
+    schedules: [{
+      userId: "u1",
+      active: true,
+      days: { 1: [["13:00", "17:30"]] },
+    }],
+  });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].userName, "Viviane");
+  assert.equal(result[0].expectedMinutes, 270);
+  assert.equal(result[0].attention.includes("Entrada esperada sem marcacao"), true);
+  assert.equal(result[0].attention.includes("Saida esperada sem marcacao"), true);
+});
+
 test("buildUserJourneyHistory returns the latest five journeys for one collaborator", () => {
   const result = buildUserJourneyHistory([
     punch({ userId: "u1", type: "in", createdAt: "2026-05-23T11:00:00.000Z" }),

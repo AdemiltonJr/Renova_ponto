@@ -1,4 +1,5 @@
 (function initJourneyHelpers(root) {
+  const Schedule = typeof require === "function" ? require("./schedule.js") : root.RenovaSchedule;
   const STATUS_LABELS = {
     not_started: "Sem entrada",
     open: "Em jornada",
@@ -9,6 +10,18 @@
 
   function getDateKey(value) {
     return new Date(value).toLocaleDateString("pt-BR");
+  }
+
+  function getIsoDateKey(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function dateKeyToIso(dateKey) {
+    if (typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return dateKey;
+    const match = String(dateKey || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return getIsoDateKey(new Date());
+    return `${match[3]}-${match[2]}-${match[1]}`;
   }
 
   function getPunchTime(punch) {
@@ -52,6 +65,53 @@
     return [...baseSteps, ...extraSteps];
   }
 
+  function minutesBetweenDates(start, end) {
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
+    return Math.round((endMs - startMs) / 60000);
+  }
+
+  function calculateWorkedMinutes(approved) {
+    let total = 0;
+    let workStart = null;
+
+    for (const punch of approved.slice().sort(byCreatedAtAsc)) {
+      if (punch.type === "in" && !workStart) {
+        workStart = punch.createdAt;
+      } else if (punch.type === "interval_in" && workStart) {
+        total += minutesBetweenDates(workStart, punch.createdAt);
+        workStart = null;
+      } else if (punch.type === "interval_out" && !workStart) {
+        workStart = punch.createdAt;
+      } else if (punch.type === "out" && workStart) {
+        total += minutesBetweenDates(workStart, punch.createdAt);
+        workStart = null;
+      }
+    }
+
+    return Math.max(total, 0);
+  }
+
+  function findScheduleForUser(schedules, userId) {
+    return (schedules || []).find((schedule) => schedule.userId === userId) || null;
+  }
+
+  function hasPunchForExpectedType(approved, type) {
+    return approved.some((punch) => punch.type === type);
+  }
+
+  function expectedEventHasPassed(event, isoDateKey, now) {
+    const expectedAt = new Date(`${isoDateKey}T${event.time}:00`);
+    return now.getTime() > expectedAt.getTime() + 5 * 60000;
+  }
+
+  function buildExpectedAttention(expectedEvents, approved, isoDateKey, now) {
+    return expectedEvents
+      .filter((event) => !hasPunchForExpectedType(approved, event.type) && expectedEventHasPassed(event, isoDateKey, now))
+      .map((event) => `${event.label} esperada sem marcacao`);
+  }
+
   function matchesSearch(summary, search) {
     const term = String(search || "").trim().toLowerCase();
     if (!term) return true;
@@ -59,12 +119,22 @@
       String(summary.userCode || "").toLowerCase().includes(term);
   }
 
-  function summarizeUserDay(userId, punches, dateKey) {
+  function summarizeUserDay(userId, punches, dateKey, options = {}) {
     const sorted = punches.slice().sort(byCreatedAtAsc);
     const approved = sorted.filter((punch) => punch.status === "approved");
     const rejected = sorted.filter((punch) => punch.status === "rejected");
     const attention = [];
     const firstApproved = approved[0] || sorted[0] || {};
+    const user = options.user || {};
+    const schedule = options.schedule || null;
+    const isoDateKey = options.isoDateKey || dateKeyToIso(dateKey);
+    const now = options.now || new Date();
+    const expectedEvents = schedule && Schedule
+      ? Schedule.getExpectedEventsForDate(schedule, isoDateKey)
+      : [];
+    const expectedMinutes = schedule && Schedule
+      ? Schedule.calculateExpectedMinutesForDate(schedule, isoDateKey)
+      : 0;
     const lastApproved = approved[approved.length - 1] || null;
     const ins = approved.filter((punch) => punch.type === "in");
     const firstIn = ins[0] || null;
@@ -97,17 +167,30 @@
     if (hasManual) addUnique(attention, "Registro manual");
     if (hasEmployeeRequest) addUnique(attention, "Ajuste solicitado pelo colaborador");
     if (hasEdited) addUnique(attention, "Registro editado");
+    for (const item of buildExpectedAttention(expectedEvents, approved, isoDateKey, now)) {
+      addUnique(attention, item);
+    }
+    if (status === "complete" && attention.length) {
+      status = "attention";
+    }
+
+    const workedMinutes = calculateWorkedMinutes(approved);
 
     return {
       userId,
-      userName: firstApproved.userName || "",
-      userCode: firstApproved.userCode || "",
+      userName: firstApproved.userName || user.name || "",
+      userCode: firstApproved.userCode || user.code || "",
       dateKey,
+      isoDateKey,
       firstIn,
       lastIntervalIn,
       lastIntervalOut,
       lastOut,
       journeySteps: buildJourneySteps(ins, intervalIns, intervalOuts, outs),
+      expectedEvents,
+      expectedMinutes,
+      workedMinutes,
+      balanceMinutes: workedMinutes - expectedMinutes,
       lastApprovedType: lastApproved?.type || null,
       status,
       statusLabel: STATUS_LABELS[status],
@@ -124,6 +207,9 @@
 
   function buildDailyJourneys(punches, options = {}) {
     const dateKey = options.dateKey || getDateKey(new Date());
+    const isoDateKey = options.isoDateKey || dateKeyToIso(dateKey);
+    const usersById = new Map((options.users || []).map((user) => [user.id, user]));
+    const schedulesByUserId = new Map((options.schedules || []).map((schedule) => [schedule.userId, schedule]));
     const grouped = new Map();
 
     for (const punch of punches || []) {
@@ -133,8 +219,18 @@
       grouped.get(key).push(punch);
     }
 
+    for (const schedule of options.schedules || []) {
+      if (!Schedule || !Schedule.getExpectedEventsForDate(schedule, isoDateKey).length) continue;
+      if (!grouped.has(schedule.userId)) grouped.set(schedule.userId, []);
+    }
+
     return Array.from(grouped.entries())
-      .map(([userId, userPunches]) => summarizeUserDay(userId, userPunches, dateKey))
+      .map(([userId, userPunches]) => summarizeUserDay(userId, userPunches, dateKey, {
+        isoDateKey,
+        now: options.now,
+        schedule: schedulesByUserId.get(userId) || null,
+        user: usersById.get(userId) || null,
+      }))
       .filter((summary) => matchesSearch(summary, options.search))
       .sort((a, b) => a.userName.localeCompare(b.userName, "pt-BR"));
   }
@@ -158,16 +254,25 @@
     }
 
     const limit = Number(options.limit || 5);
+    const schedule = findScheduleForUser(options.schedules || [], userId);
+    const user = (options.users || []).find((item) => item.id === userId) || null;
     return Array.from(grouped.entries())
       .sort(([aDate], [bDate]) => byDateKeyDesc(aDate, bDate))
       .slice(0, limit)
-      .map(([dateKey, userPunches]) => summarizeUserDay(userId, userPunches, dateKey));
+      .map(([dateKey, userPunches]) => summarizeUserDay(userId, userPunches, dateKey, {
+        isoDateKey: dateKeyToIso(dateKey),
+        now: options.now,
+        schedule,
+        user,
+      }));
   }
 
   const api = {
     buildDailyJourneys,
     buildUserJourneyHistory,
+    dateKeyToIso,
     getDateKey,
+    getIsoDateKey,
     getPunchTime,
     isManualPunch,
   };

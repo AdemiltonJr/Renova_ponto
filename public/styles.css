@@ -926,6 +926,33 @@ input:focus {
   margin-top: 4px;
 }
 
+.notification-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 22px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
+}
+
+.notification-panel h3 {
+  margin: 2px 0 0;
+  color: var(--brand-blue-dark);
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.notification-panel p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .journey-header {
   display: flex;
   align-items: flex-start;
@@ -1100,6 +1127,33 @@ input:focus {
   line-height: 1.1;
 }
 
+.journey-hours {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.journey-hours span {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(46, 91, 153, 0.03);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.journey-hours strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--brand-blue-dark);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
 .journey-attention {
   display: flex;
   flex-wrap: wrap;
@@ -1114,6 +1168,50 @@ input:focus {
   background: rgba(239, 68, 68, 0.1);
   font-size: 12px;
   font-weight: 800;
+}
+
+.schedule-admin-panel {
+  margin-top: 18px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(46, 91, 153, 0.025);
+}
+
+.schedule-admin-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.schedule-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.schedule-row.inactive {
+  opacity: 0.62;
+}
+
+.schedule-row strong {
+  display: block;
+  color: var(--brand-blue-dark);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.schedule-row span,
+.schedule-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .audit-table-heading {
@@ -1296,6 +1394,13 @@ input:focus {
   .request-status,
   .request-actions {
     align-self: flex-start;
+  }
+  .notification-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .journey-hours {
+    grid-template-columns: 1fr;
   }
   .journey-header {
     flex-direction: column;
